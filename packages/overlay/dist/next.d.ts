@@ -1,5 +1,14 @@
-export { S as ShipflowOverlayServerOptions, c as createNextHandler } from './createNextHandler-DAy_9x9m.js';
-import 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+
+type ShipflowOverlayServerOptions = {
+    cursorAgentBinary?: string;
+    additionalSearchDirs?: string[];
+    defaultModel?: string;
+    allowInProduction?: boolean;
+    timeoutMs?: number;
+    logPrefix?: string;
+};
+declare function createNextHandler(options?: ShipflowOverlayServerOptions): (request: NextRequest) => Promise<NextResponse<unknown>>;
 
 type NextConfig = Record<string, unknown>;
 type ShipflowOverlayNextOptions = {
@@ -9,4 +18,4 @@ type ShipflowOverlayNextOptions = {
 };
 declare function withShipflowOverlay<T extends NextConfig = NextConfig>(config?: T, options?: ShipflowOverlayNextOptions): T & NextConfig;
 
-export { type ShipflowOverlayNextOptions, withShipflowOverlay };
+export { type ShipflowOverlayNextOptions, type ShipflowOverlayServerOptions, createNextHandler, withShipflowOverlay };

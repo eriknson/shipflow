@@ -85,3 +85,4 @@ It checks for the Cursor CLI, creates the provider and API route stubs, and appe
 ## License
 
 MIT © Shipflow
+

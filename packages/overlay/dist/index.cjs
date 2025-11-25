@@ -1,9 +1,7 @@
 "use strict";
-var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
-var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
 var __export = (target, all) => {
   for (var name in all)
@@ -17,14 +15,6 @@ var __copyProps = (to, from, except, desc) => {
   }
   return to;
 };
-var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
-  // If the importer is in node compatibility mode or this is not an ESM
-  // file that has been converted to a CommonJS file using a Babel-
-  // compatible transform (i.e. "__esModule" has not been set), then set
-  // "default" to the CommonJS "module.exports" for node compatibility.
-  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
-  mod
-));
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // src/index.ts
@@ -34,7 +24,6 @@ __export(index_exports, {
   DEFAULT_STATUS_SEQUENCE: () => DEFAULT_STATUS_SEQUENCE,
   FlowOverlayProvider: () => FlowOverlayProvider,
   Typewriter: () => Typewriter,
-  createNextHandler: () => createNextHandler,
   loadReactGrabRuntime: () => loadReactGrabRuntime,
   registerClipboardInterceptor: () => registerClipboardInterceptor
 });
@@ -44,13 +33,6 @@ module.exports = __toCommonJS(index_exports);
 var import_react = require("react");
 var import_react_dom = require("react-dom");
 var import_lucide_react = require("lucide-react");
-
-// src/runtime/cn.ts
-var import_clsx = require("clsx");
-var import_tailwind_merge = require("tailwind-merge");
-function cn(...inputs) {
-  return (0, import_tailwind_merge.twMerge)((0, import_clsx.clsx)(inputs));
-}
 
 // src/runtime/constants.ts
 var DEFAULT_STATUS_SEQUENCE = [
@@ -70,7 +52,7 @@ var DEFAULT_SCRIPT_URL = "https://unpkg.com/react-grab@0.0.51/dist/index.global.
 var GLOBAL_FLAG = "__shipflowReactGrabLoaded";
 var pendingLoad = null;
 function loadReactGrabRuntime(options = {}) {
-  var _a3;
+  var _a;
   if (typeof window === "undefined") {
     return Promise.resolve();
   }
@@ -80,7 +62,7 @@ function loadReactGrabRuntime(options = {}) {
   if (pendingLoad) {
     return pendingLoad;
   }
-  const scriptUrl = (_a3 = options.url) != null ? _a3 : DEFAULT_SCRIPT_URL;
+  const scriptUrl = (_a = options.url) != null ? _a : DEFAULT_SCRIPT_URL;
   pendingLoad = new Promise((resolve, reject) => {
     const existing = Array.from(document.scripts).find((script2) => script2.src === scriptUrl);
     if (existing) {
@@ -141,13 +123,27 @@ function parseClipboard(text) {
   return { htmlFrame, codeLocation };
 }
 function extractFilePath(stack) {
+  var _a;
   if (typeof stack !== "string") return null;
-  const pathRegex = /\b(?:in\s+|at\s+)((?:[A-Za-z]:)?\/?[^:\s)]+?\.(?:[jt]sx?|mdx?))/g;
-  let match = null;
-  while (match = pathRegex.exec(stack)) {
-    const candidate = match[1];
-    if (candidate) {
-      return candidate.trim();
+  const patterns = [
+    // Format: "in Component (path/to/file.tsx:10:5)" or "at Component (path/to/file.tsx:10:5)"
+    /\b(?:in|at)\s+\S+\s*\(([^()]+?\.(?:[jt]sx?|mdx?))(?::\d+)*\)/gi,
+    // Format: "in path/to/file.tsx" or "at path/to/file.tsx"
+    /\b(?:in|at)\s+((?:[A-Za-z]:)?[^\s:()]+?\.(?:[jt]sx?|mdx?))/gi,
+    // Format: just "(path/to/file.tsx:10:5)" in parentheses
+    /\(([^()]+?\.(?:[jt]sx?|mdx?))(?::\d+)*\)/gi,
+    // Format: bare path like "app/page.tsx" or "./app/page.tsx"
+    /(?:^|\s)((?:\.\/)?(?:[A-Za-z]:)?[^\s:()]+?\.(?:[jt]sx?|mdx?))/gim
+  ];
+  for (const pattern of patterns) {
+    pattern.lastIndex = 0;
+    let match = null;
+    while (match = pattern.exec(stack)) {
+      const candidate = (_a = match[1]) == null ? void 0 : _a.trim();
+      if (!candidate) continue;
+      if (candidate.includes("node_modules")) continue;
+      if (candidate.includes("://")) continue;
+      return candidate;
     }
   }
   return null;
@@ -163,11 +159,11 @@ function toRelativePath(filePath, projectRoot) {
   return filePath;
 }
 function findElementAtPoint(clientX, clientY) {
-  var _a3;
+  var _a;
   const elements = document.elementsFromPoint(clientX, clientY);
   for (const element of elements) {
     if (!(element instanceof HTMLElement)) continue;
-    if ((_a3 = element.closest) == null ? void 0 : _a3.call(element, "[data-react-grab]")) continue;
+    if ((_a = element.closest) == null ? void 0 : _a.call(element, "[data-react-grab]")) continue;
     const style = window.getComputedStyle(element);
     if (style.pointerEvents === "none" || style.visibility === "hidden" || style.display === "none" || Number(style.opacity) === 0) {
       continue;
@@ -177,7 +173,7 @@ function findElementAtPoint(clientX, clientY) {
   return null;
 }
 function findTooltipElement() {
-  var _a3;
+  var _a;
   const OVERLAY_SELECTOR = '[data-react-grab="true"]';
   const TOOLTIP_SELECTOR = "div.pointer-events-none.bg-grab-pink-light.text-grab-pink";
   const visited = /* @__PURE__ */ new Set();
@@ -206,7 +202,7 @@ function findTooltipElement() {
   };
   const hosts = document.querySelectorAll(OVERLAY_SELECTOR);
   for (const host of hosts) {
-    const found = (_a3 = visit(host)) != null ? _a3 : host.shadowRoot ? visit(host.shadowRoot) : null;
+    const found = (_a = visit(host)) != null ? _a : host.shadowRoot ? visit(host.shadowRoot) : null;
     if (found) {
       return found;
     }
@@ -249,7 +245,7 @@ function dispatchOpenEvent(detail) {
   );
 }
 function registerClipboardInterceptor(options = {}) {
-  var _a3, _b2;
+  var _a, _b;
   if (typeof window === "undefined" || typeof navigator === "undefined") {
     return () => void 0;
   }
@@ -261,8 +257,8 @@ function registerClipboardInterceptor(options = {}) {
     return () => void 0;
   }
   const projectRoot = options.projectRoot;
-  const highlightColor = (_a3 = options.highlightColor) != null ? _a3 : defaultOptions.highlightColor;
-  const highlightStyleId = (_b2 = options.highlightStyleId) != null ? _b2 : defaultOptions.highlightStyleId;
+  const highlightColor = (_a = options.highlightColor) != null ? _a : defaultOptions.highlightColor;
+  const highlightStyleId = (_b = options.highlightStyleId) != null ? _b : defaultOptions.highlightStyleId;
   const logClipboardEndpoint = options.logClipboardEndpoint === void 0 ? null : options.logClipboardEndpoint;
   ensureHighlightStyles(highlightColor, highlightStyleId);
   clearHighlight();
@@ -352,6 +348,447 @@ function registerClipboardInterceptor(options = {}) {
 // src/runtime/FlowOverlay.tsx
 var import_jsx_runtime = require("react/jsx-runtime");
 var HIGHLIGHT_QUERY = "[data-react-grab-chat-highlighted='true']";
+var OVERLAY_STYLE_ID = "shipflow-overlay-styles";
+var OVERLAY_ROOT_ID = "shipflow-overlay-root";
+var ensureOverlayStyles = (root) => {
+  var _a, _b, _c;
+  if ("getElementById" in root && root.getElementById(OVERLAY_STYLE_ID)) {
+    return;
+  }
+  const style = document.createElement("style");
+  style.id = OVERLAY_STYLE_ID;
+  style.textContent = `
+:host {
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  line-height: 1.5;
+  color: var(--sf-text);
+  font-size: 14px;
+  --sf-bg: rgba(250, 250, 250, 0.7);
+  --sf-border: rgba(229, 229, 229, 0.5);
+  --sf-text: #171717;
+  --sf-muted-text: #6b7280;
+  --sf-placeholder: #9ca3af;
+  --sf-inline-bg: rgba(212, 212, 212, 0.6);
+  --sf-inline-hover-bg: rgba(212, 212, 212, 0.85);
+  --sf-inline-text: #4b5563;
+  --sf-inline-disabled-opacity: 0.5;
+  --sf-select-bg: transparent;
+  --sf-select-hover-bg: rgba(212, 212, 212, 0.25);
+  --sf-select-text: #4b5563;
+  --sf-focus-ring: rgba(212, 212, 212, 0.5);
+  --sf-submit-bg: #171717;
+  --sf-submit-hover-bg: #262626;
+  --sf-submit-text: #ffffff;
+  --sf-status-bg: rgba(245, 245, 245, 0.45);
+  --sf-status-border: rgba(229, 229, 229, 0.3);
+  --sf-error-bg: rgba(254, 242, 242, 0.6);
+  --sf-error-border: rgba(254, 202, 202, 0.5);
+  --sf-error-text: #dc2626;
+  --sf-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  --sf-body-gap: 0.5rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :host {
+    --sf-bg: rgba(23, 23, 23, 0.75);
+    --sf-border: rgba(64, 64, 64, 0.5);
+    --sf-text: #f5f5f5;
+    --sf-muted-text: #a3a3a3;
+    --sf-placeholder: #737373;
+    --sf-inline-bg: rgba(64, 64, 64, 0.5);
+    --sf-inline-hover-bg: rgba(64, 64, 64, 0.8);
+    --sf-inline-text: #e5e5e5;
+    --sf-select-bg: transparent;
+    --sf-select-hover-bg: rgba(64, 64, 64, 0.3);
+    --sf-select-text: #a3a3a3;
+    --sf-focus-ring: rgba(64, 64, 64, 0.5);
+    --sf-submit-bg: #f5f5f5;
+    --sf-submit-hover-bg: #e5e5e5;
+    --sf-submit-text: #111827;
+    --sf-status-bg: rgba(23, 23, 23, 0.35);
+    --sf-status-border: rgba(64, 64, 64, 0.4);
+    --sf-error-bg: rgba(239, 68, 68, 0.18);
+    --sf-error-border: rgba(239, 68, 68, 0.35);
+    --sf-error-text: #fecaca;
+    --sf-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+  }
+}
+
+:host([data-theme="dark"]),
+:host-context(.dark) {
+  --sf-bg: rgba(23, 23, 23, 0.75);
+  --sf-border: rgba(64, 64, 64, 0.5);
+  --sf-text: #f5f5f5;
+  --sf-muted-text: #a3a3a3;
+  --sf-placeholder: #737373;
+  --sf-inline-bg: rgba(64, 64, 64, 0.5);
+  --sf-inline-hover-bg: rgba(64, 64, 64, 0.8);
+  --sf-inline-text: #e5e5e5;
+  --sf-select-bg: rgba(38, 38, 38, 0.6);
+  --sf-select-hover-bg: rgba(38, 38, 38, 0.8);
+  --sf-select-text: #d4d4d4;
+  --sf-focus-ring: rgba(64, 64, 64, 0.5);
+  --sf-submit-bg: #f5f5f5;
+  --sf-submit-hover-bg: #e5e5e5;
+  --sf-submit-text: #111827;
+  --sf-status-bg: rgba(23, 23, 23, 0.35);
+  --sf-status-border: rgba(64, 64, 64, 0.4);
+  --sf-error-bg: rgba(239, 68, 68, 0.18);
+  --sf-error-border: rgba(239, 68, 68, 0.35);
+  --sf-error-text: #fecaca;
+  --sf-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+}
+
+:host *,
+:host *::before,
+:host *::after {
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+[data-react-grab-chat-bubble="true"] {
+  position: fixed;
+  z-index: 2147483647;
+  display: flex;
+  width: 100%;
+  max-width: 400px;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid var(--sf-border);
+  background: var(--sf-bg);
+  color: var(--sf-text);
+  box-shadow: var(--sf-shadow);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  animation: shipflow-fade-in 120ms ease-out;
+  pointer-events: auto;
+}
+
+[data-sf-body="true"] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-body-gap);
+  padding: 12px;
+}
+
+[data-sf-body="true"][data-expanded="false"] {
+  --sf-body-gap: 0;
+}
+
+[data-sf-row="input"] {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+[data-sf-input="true"] {
+  width: 100%;
+  resize: none;
+  border: none;
+  background: transparent;
+  color: var(--sf-text);
+  font-size: 0.875rem;
+  line-height: 1.6;
+  padding-right: 2.5rem;
+  outline: none;
+}
+
+[data-sf-input="true"][data-expanded="true"] {
+  padding-right: 0;
+}
+
+[data-sf-input="true"]::placeholder {
+  color: var(--sf-placeholder);
+}
+
+[data-sf-input="true"][disabled] {
+  opacity: 0.6;
+}
+
+[data-sf-inline-submit="true"] {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 2rem;
+  width: 2rem;
+  border-radius: 9999px;
+  background: var(--sf-inline-bg);
+  color: var(--sf-inline-text);
+  border: none;
+  cursor: pointer;
+  transition: background-color 150ms ease, transform 150ms ease, opacity 150ms ease;
+}
+
+[data-sf-inline-submit="true"]:hover:not([disabled]) {
+  background: var(--sf-inline-hover-bg);
+}
+
+[data-sf-inline-submit="true"][disabled] {
+  opacity: var(--sf-inline-disabled-opacity);
+  cursor: default;
+}
+
+[data-sf-toolbar="true"] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+[data-sf-select-wrapper="true"] {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+[data-sf-select="true"] {
+  height: 2rem;
+  appearance: none;
+  border-radius: 8px;
+  border: none;
+  background: var(--sf-select-bg);
+  color: var(--sf-select-text);
+  padding: 0 26px 0 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 150ms ease, box-shadow 150ms ease;
+}
+
+[data-sf-select="true"]:hover:not([disabled]) {
+  background: var(--sf-select-hover-bg);
+}
+
+[data-sf-select="true"]:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--sf-focus-ring);
+}
+
+[data-sf-select="true"][disabled] {
+  opacity: 0.55;
+  cursor: default;
+}
+
+[data-sf-select-chevron="true"] {
+  position: absolute;
+  pointer-events: none;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--sf-placeholder);
+}
+
+[data-sf-submit="true"] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 2rem;
+  width: 2rem;
+  border-radius: 9999px;
+  border: none;
+  cursor: pointer;
+  background: var(--sf-submit-bg);
+  color: var(--sf-submit-text);
+  transition: transform 150ms ease, background-color 150ms ease, opacity 150ms ease;
+}
+
+[data-sf-submit="true"]:hover:not([disabled]) {
+  background: var(--sf-submit-hover-bg);
+  transform: scale(1.05);
+}
+
+[data-sf-submit="true"][disabled] {
+  opacity: 0.65;
+  cursor: default;
+  transform: scale(1);
+}
+
+[data-sf-submit="true"][data-hidden="true"] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+[data-sf-status="true"] {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 1px solid var(--sf-status-border);
+  background: var(--sf-status-bg);
+  padding: 10px 12px;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+[data-sf-status="true"][data-mode="progress"] {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--sf-muted-text);
+}
+
+[data-sf-status-header="true"] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+[data-sf-status-label="true"] {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  font-size: 0.75rem;
+  color: var(--sf-muted-text);
+  flex-shrink: 0;
+}
+
+[data-sf-status-context="true"] {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: right;
+  color: var(--sf-muted-text);
+  font-size: 0.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-sf-status="true"][data-mode="summary"] {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--sf-muted-text);
+}
+
+[data-sf-status="true"][data-mode="summary"] [data-sf-status-header="true"] {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+[data-sf-status="true"][data-mode="summary"] [data-sf-undo="true"] {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: transparent;
+  color: var(--sf-muted-text);
+  cursor: pointer;
+  padding: 0;
+  font-size: 0.75rem;
+  transition: color 120ms ease;
+}
+
+[data-sf-status="true"][data-mode="summary"] [data-sf-undo="true"]:hover {
+  color: var(--sf-text);
+}
+
+[data-sf-undo-wrapper="true"] {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+[data-sf-undo="true"] svg {
+  width: 12px;
+  height: 12px;
+}
+
+[data-sf-error="true"] {
+  border-top: 1px solid var(--sf-error-border);
+  background: var(--sf-error-bg);
+  color: var(--sf-error-text);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 10px 12px;
+}
+
+[data-sf-icon="cursor"] {
+  width: 14px;
+  height: 14px;
+}
+
+[data-sf-icon="cursor"][data-loading="true"] {
+  animation: shipflow-pulse 1.5s ease-in-out infinite;
+}
+
+[data-sf-inline-submit="true"] svg,
+[data-sf-submit="true"] svg {
+  width: 14px;
+  height: 14px;
+}
+
+[data-sf-submit="true"][data-submitting="true"] svg {
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+}
+
+[data-sf-shimmer="true"] {
+  background: linear-gradient(90deg, var(--sf-muted-text), transparent, var(--sf-muted-text));
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shipflow-shimmer 2.4s linear infinite;
+  opacity: 0.75;
+}
+
+@keyframes shipflow-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shipflow-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes shipflow-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 0.25; }
+}
+`;
+  const target = root instanceof Document ? (_c = (_b = (_a = root.head) != null ? _a : root.body) != null ? _b : root.documentElement) != null ? _c : root : root;
+  target.appendChild(style);
+};
+var getOrCreateOverlayMount = () => {
+  var _a;
+  if (typeof document === "undefined") {
+    return null;
+  }
+  let container = document.getElementById(OVERLAY_ROOT_ID);
+  if (!container) {
+    container = document.createElement("div");
+    container.id = OVERLAY_ROOT_ID;
+    container.style.position = "fixed";
+    container.style.top = "0";
+    container.style.left = "0";
+    container.style.width = "0";
+    container.style.height = "0";
+    container.style.zIndex = "2147483646";
+    document.body.appendChild(container);
+  }
+  let root;
+  if (typeof container.attachShadow === "function") {
+    root = (_a = container.shadowRoot) != null ? _a : container.attachShadow({ mode: "open" });
+  } else {
+    root = container;
+  }
+  return { container, root };
+};
 var EVENT_OPEN2 = "react-grab-chat:open";
 var EVENT_CLOSE2 = "react-grab-chat:close";
 var EVENT_UNDO = "react-grab-chat:undo";
@@ -370,7 +807,7 @@ var ANCHOR_GAP = 24;
 var POINTER_HORIZONTAL_GAP = 16;
 var POINTER_VERTICAL_OFFSET = 12;
 var createInitialState = (models, statusSequence) => {
-  var _a3, _b2, _c;
+  var _a, _b, _c;
   return {
     htmlFrame: null,
     codeLocation: null,
@@ -382,7 +819,7 @@ var createInitialState = (models, statusSequence) => {
     status: "idle",
     serverMessage: void 0,
     error: void 0,
-    model: (_b2 = (_a3 = models[0]) == null ? void 0 : _a3.value) != null ? _b2 : "",
+    model: (_b = (_a = models[0]) == null ? void 0 : _a.value) != null ? _b : "",
     statusPhase: 0,
     statusAddonMode: "idle",
     statusLabel: (_c = statusSequence[0]) != null ? _c : null,
@@ -391,12 +828,13 @@ var createInitialState = (models, statusSequence) => {
     summary: void 0
   };
 };
-function CursorIcon({ className }) {
+function CursorIcon({ loading }) {
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
     "svg",
     {
       viewBox: "0 0 466.73 533.32",
-      className,
+      "data-sf-icon": "cursor",
+      "data-loading": loading ? "true" : void 0,
       xmlns: "http://www.w3.org/2000/svg",
       shapeRendering: "geometricPrecision",
       children: [
@@ -483,29 +921,32 @@ function useEscapeToClose(isOpen, onClose) {
     return () => window.removeEventListener("keydown", handler, true);
   }, [isOpen, onClose]);
 }
-function useAutoFocus(isOpen) {
+function useAutoFocus(isOpen, shadowRoot) {
   (0, import_react.useEffect)(() => {
-    if (!isOpen) return;
+    if (!isOpen || !shadowRoot) return;
     const frame = requestAnimationFrame(() => {
-      const textarea = document.querySelector(
+      const root = shadowRoot instanceof ShadowRoot ? shadowRoot : document;
+      const textarea = root.querySelector(
         "[data-react-grab-chat-input='true']"
       );
       textarea == null ? void 0 : textarea.focus();
-      textarea == null ? void 0 : textarea.select();
     });
     return () => cancelAnimationFrame(frame);
-  }, [isOpen]);
+  }, [isOpen, shadowRoot]);
 }
 function useClickOutside(ref, isOpen, onClose) {
   (0, import_react.useEffect)(() => {
     if (!isOpen) return;
     const handleClickOutside = (event) => {
-      const target = event.target;
-      if (ref.current && !ref.current.contains(target)) {
-        const highlightedElement = document.querySelector(HIGHLIGHT_QUERY);
-        if (!highlightedElement || !highlightedElement.contains(target)) {
-          onClose();
-        }
+      const path = event.composedPath();
+      const clickedInsideBubble = ref.current && path.includes(ref.current);
+      if (clickedInsideBubble) {
+        return;
+      }
+      const highlightedElement = document.querySelector(HIGHLIGHT_QUERY);
+      const clickedInsideHighlight = highlightedElement && path.includes(highlightedElement);
+      if (!clickedInsideHighlight) {
+        onClose();
       }
     };
     document.addEventListener("mousedown", handleClickOutside, true);
@@ -541,7 +982,7 @@ function Bubble({
   modelOptions,
   statusSequence
 }) {
-  var _a3, _b2, _c;
+  var _a, _b, _c;
   const anchor = chat.boundingRect;
   const bubbleRef = (0, import_react.useRef)(null);
   const [bubbleSize, setBubbleSize] = (0, import_react.useState)(null);
@@ -574,7 +1015,7 @@ function Bubble({
     };
   }, []);
   (0, import_react.useLayoutEffect)(() => {
-    var _a4;
+    var _a2;
     if (!bubbleSize) {
       setBubbleStyle((prev) => prev === DEFAULT_BUBBLE_STYLE ? prev : DEFAULT_BUBBLE_STYLE);
       return;
@@ -672,18 +1113,18 @@ function Bubble({
       );
       if (perfectCandidate) {
         bestStyle = {
-          top: `${Math.round(perfectCandidate.top + scrollY)}px`,
-          left: `${Math.round(perfectCandidate.left + scrollX)}px`
+          top: `${Math.round(perfectCandidate.top)}px`,
+          left: `${Math.round(perfectCandidate.left)}px`
         };
       } else if (!pointer) {
-        const bestCandidate = (_a4 = orderedCandidates.find((candidate) => candidate.fits)) != null ? _a4 : orderedCandidates.length > 0 ? orderedCandidates.reduce(
+        const bestCandidate = (_a2 = orderedCandidates.find((candidate) => candidate.fits)) != null ? _a2 : orderedCandidates.length > 0 ? orderedCandidates.reduce(
           (best, candidate) => candidate.overflow < best.overflow ? candidate : best,
           orderedCandidates[0]
         ) : null;
         if (bestCandidate) {
           bestStyle = {
-            top: `${Math.round(bestCandidate.top + scrollY)}px`,
-            left: `${Math.round(bestCandidate.left + scrollX)}px`
+            top: `${Math.round(bestCandidate.top)}px`,
+            left: `${Math.round(bestCandidate.left)}px`
           };
         }
       }
@@ -700,8 +1141,8 @@ function Bubble({
       }
       const clampedLeft = clampHorizontal(targetLeft);
       bestStyle = {
-        top: `${Math.round(clampedTop + scrollY)}px`,
-        left: `${Math.round(clampedLeft + scrollX)}px`
+        top: `${Math.round(clampedTop)}px`,
+        left: `${Math.round(clampedLeft)}px`
       };
     }
     if (bestStyle) {
@@ -719,9 +1160,9 @@ function Bubble({
   const hasInput = chat.instruction.trim().length > 0;
   const showExpandedLayout = hasInput || chat.status !== "idle";
   const disableEditing = isSubmitting;
-  const computedStatusLabel = (_c = (_b2 = (_a3 = chat.statusLabel) != null ? _a3 : statusSequence[chat.statusPhase]) != null ? _b2 : statusSequence[0]) != null ? _c : null;
+  const computedStatusLabel = (_c = (_b = (_a = chat.statusLabel) != null ? _a : statusSequence[chat.statusPhase]) != null ? _b : statusSequence[0]) != null ? _c : null;
   const handleUndo = (0, import_react.useCallback)(() => {
-    var _a4;
+    var _a2;
     if (chat.statusAddonMode !== "summary") {
       return;
     }
@@ -729,7 +1170,7 @@ function Bubble({
       new CustomEvent(EVENT_UNDO, {
         detail: {
           instruction: chat.instruction,
-          summary: (_a4 = chat.summary) != null ? _a4 : null,
+          summary: (_a2 = chat.summary) != null ? _a2 : null,
           filePath: chat.filePath
         }
       })
@@ -770,10 +1211,6 @@ function Bubble({
     "div",
     {
       ref: bubbleRef,
-      className: cn(
-        "absolute z-[2147483647] flex w-full max-w-[400px] flex-col overflow-hidden rounded-xl border border-neutral-200/40 bg-neutral-50/60 text-neutral-900 shadow-2xl backdrop-blur-2xl font-sans dark:border-neutral-700/40 dark:bg-neutral-900/60 dark:text-neutral-50",
-        "animate-in fade-in-0 zoom-in-95 duration-100 ease-out"
-      ),
       style: bubbleStyle,
       role: "dialog",
       "aria-modal": "true",
@@ -784,28 +1221,23 @@ function Bubble({
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
           "div",
           {
-            className: cn(
-              "flex w-full flex-col p-3",
-              showExpandedLayout ? "gap-2" : "gap-0"
-            ),
+            "data-sf-body": "true",
+            "data-expanded": showExpandedLayout ? "true" : "false",
             children: [
-              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "relative flex w-full items-center gap-3", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { "data-sf-row": "input", children: [
                 /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
                   "textarea",
                   {
                     ref: textareaRef,
                     "data-react-grab-chat-input": "true",
                     rows: showExpandedLayout ? 2 : 1,
-                    className: cn(
-                      "w-full resize-none bg-transparent text-sm font-normal leading-relaxed text-neutral-800 placeholder:text-neutral-400 outline-none dark:text-neutral-100 dark:placeholder:text-neutral-500",
-                      disableEditing && "opacity-50",
-                      !showExpandedLayout && "pr-10"
-                    ),
                     placeholder: "Change anything",
                     value: chat.instruction,
                     onChange: handleChange,
                     onKeyDown: handleKeyDown,
-                    disabled: disableEditing
+                    disabled: disableEditing,
+                    "data-sf-input": "true",
+                    "data-expanded": showExpandedLayout ? "true" : "false"
                   }
                 ),
                 !showExpandedLayout ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
@@ -814,29 +1246,25 @@ function Bubble({
                     type: "button",
                     onClick: onSubmit,
                     disabled: !hasInput || isSubmitting,
-                    className: cn(
-                      "absolute right-0 top-1/2 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-neutral-300/50 text-neutral-600 transition hover:bg-neutral-300/80 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-neutral-700/50 dark:text-neutral-300 dark:hover:bg-neutral-700/80"
-                    ),
-                    children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_lucide_react.ArrowUp, { className: "h-4 w-4" })
+                    "data-sf-inline-submit": "true",
+                    children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_lucide_react.ArrowUp, {})
                   }
                 ) : null
               ] }),
-              showExpandedLayout ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-center justify-between animate-in fade-in slide-in-from-top-1 duration-150 ease-out", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "relative inline-flex", children: [
+              showExpandedLayout ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { "data-sf-toolbar": "true", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { "data-sf-select-wrapper": "true", children: [
                   /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
                     "select",
                     {
                       "aria-label": "Model selection",
-                      className: cn(
-                        "h-8 w-auto appearance-none rounded-lg bg-neutral-200/50 pl-3 pr-[26px] text-xs font-medium text-neutral-500 transition hover:bg-neutral-200/70 focus:outline-none focus:ring-2 focus:ring-neutral-300/50 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-neutral-800/50 dark:text-neutral-400 dark:hover:bg-neutral-800/70 dark:focus:ring-neutral-700/50"
-                      ),
                       value: chat.model,
                       onChange: (event) => onModelChange(event.target.value),
                       disabled: disableEditing,
+                      "data-sf-select": "true",
                       children: modelOptions.map((option) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: option.value, children: option.label }, option.value))
                     }
                   ),
-                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 dark:text-neutral-500", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", { width: "10", height: "6", viewBox: "0 0 10 6", fill: "none", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M1 1l4 4 4-4", stroke: "currentColor", strokeWidth: "1.5", strokeLinecap: "round", strokeLinejoin: "round" }) }) })
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { "data-sf-select-chevron": "true", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", { width: "10", height: "6", viewBox: "0 0 10 6", fill: "none", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M1 1l4 4 4-4", stroke: "currentColor", strokeWidth: "1.5", strokeLinecap: "round", strokeLinejoin: "round" }) }) })
                 ] }),
                 /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
                   "button",
@@ -844,62 +1272,106 @@ function Bubble({
                     type: "button",
                     onClick: isSubmitting ? onStop : onSubmit,
                     disabled: !hasInput && !isSubmitting,
-                    className: cn(
-                      "flex h-8 w-8 items-center justify-center rounded-full transition-all duration-200",
-                      isSubmitting ? "bg-neutral-900 text-white hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200" : "bg-neutral-900 text-white shadow-lg hover:bg-neutral-800 hover:scale-105 dark:bg-white dark:text-black dark:hover:bg-neutral-200",
-                      !hasInput && !isSubmitting && "opacity-0 pointer-events-none"
-                    ),
-                    children: isSubmitting ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_lucide_react.Square, { className: "h-3 w-3 fill-current" }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_lucide_react.ArrowUp, { className: "h-4 w-4" })
+                    "data-sf-submit": "true",
+                    "data-hidden": !hasInput && !isSubmitting ? "true" : "false",
+                    "data-submitting": isSubmitting ? "true" : "false",
+                    children: isSubmitting ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_lucide_react.Square, {}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_lucide_react.ArrowUp, {})
                   }
                 )
               ] }) : null
             ]
           }
         ),
-        chat.statusAddonMode !== "idle" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "flex w-full flex-col border-t border-neutral-200/30 bg-neutral-100/30 px-3 py-2 backdrop-blur-xl dark:border-neutral-800/30 dark:bg-neutral-900/30 animate-in fade-in slide-in-from-top-1 duration-150 ease-out", children: chat.statusAddonMode === "progress" ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-center justify-between gap-3 text-xs font-medium", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-center gap-2 shrink-0", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CursorIcon, { className: "h-3.5 w-3.5 animate-pulse-subtle" }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "bg-gradient-to-r from-neutral-600 via-neutral-600/40 to-neutral-600 bg-[length:200%_100%] bg-clip-text text-transparent animate-shimmer dark:from-neutral-400 dark:via-neutral-400/40 dark:to-neutral-400 opacity-60", children: computedStatusLabel })
-          ] }),
-          chat.statusContext && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "min-w-0 flex-1 truncate text-right text-neutral-400 dark:text-neutral-500", children: chat.useTypewriter ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Typewriter, { text: chat.statusContext }) : chat.statusContext })
-        ] }) : chat.statusAddonMode === "summary" && chat.summary ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-center justify-between text-xs font-medium", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-center gap-2 text-neutral-600 dark:text-neutral-400", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CursorIcon, { className: "h-3.5 w-3.5" }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Changes applied" })
-          ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "flex items-center gap-3", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
-            "button",
-            {
-              type: "button",
-              onClick: handleUndo,
-              className: "flex items-center gap-1 text-neutral-400 transition hover:text-neutral-900 dark:text-neutral-500 dark:hover:text-neutral-200",
-              children: [
-                "Undo ",
-                /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_lucide_react.Command, { className: "h-3 w-3 ml-0.5" }),
-                " Z"
-              ]
-            }
-          ) })
-        ] }) : null }),
-        chat.error ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "border-t border-red-200/50 bg-red-50/50 px-3 py-2 text-xs font-medium text-red-600 backdrop-blur-xl dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200", children: chat.error }) : null
+        chat.statusAddonMode !== "idle" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+          "div",
+          {
+            "data-sf-status": "true",
+            "data-mode": chat.statusAddonMode,
+            children: chat.statusAddonMode === "progress" ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { "data-sf-status-header": "true", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { "data-sf-status-label": "true", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CursorIcon, { loading: true }),
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { "data-sf-shimmer": "true", children: computedStatusLabel })
+              ] }),
+              chat.statusContext && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { "data-sf-status-context": "true", children: chat.useTypewriter ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Typewriter, { text: chat.statusContext }) : chat.statusContext })
+            ] }) : chat.statusAddonMode === "summary" && chat.summary ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { "data-sf-status-header": "true", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { "data-sf-status-label": "true", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CursorIcon, {}),
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Changes applied" })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { "data-sf-undo-wrapper": "true", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+                "button",
+                {
+                  type: "button",
+                  onClick: handleUndo,
+                  "data-sf-undo": "true",
+                  children: [
+                    "Undo ",
+                    /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_lucide_react.Command, {}),
+                    " Z"
+                  ]
+                }
+              ) })
+            ] }) : null
+          }
+        ),
+        chat.error ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { "data-sf-error": "true", children: chat.error }) : null
       ]
     }
   );
 }
 function FlowOverlayProvider(props = {}) {
-  var _a3;
+  var _a;
+  const [portalTarget, setPortalTarget] = (0, import_react.useState)(null);
+  const overlayContainerRef = (0, import_react.useRef)(null);
+  (0, import_react.useEffect)(() => {
+    const mount = getOrCreateOverlayMount();
+    if (!mount) return;
+    overlayContainerRef.current = mount.container;
+    if (mount.root instanceof ShadowRoot) {
+      ensureOverlayStyles(mount.root);
+    } else if (typeof document !== "undefined") {
+      ensureOverlayStyles(document);
+    }
+    setPortalTarget(mount.root);
+    return () => {
+      if (mount.container.childNodes.length === 0 && mount.container.isConnected) {
+        mount.container.remove();
+      }
+    };
+  }, []);
+  (0, import_react.useEffect)(() => {
+    if (typeof document === "undefined") return;
+    const container = overlayContainerRef.current;
+    if (!container) return;
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const updateTheme = () => {
+      const docEl = document.documentElement;
+      const hasDark = docEl.classList.contains("dark");
+      const hasLight = docEl.classList.contains("light");
+      const isDark = hasDark || !hasLight && media.matches;
+      container.dataset.theme = isDark ? "dark" : "light";
+    };
+    updateTheme();
+    const observer = new MutationObserver(updateTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    media.addEventListener("change", updateTheme);
+    return () => {
+      observer.disconnect();
+      media.removeEventListener("change", updateTheme);
+    };
+  }, [portalTarget]);
   const clipboardOptions = (0, import_react.useMemo)(
     () => {
-      var _a4;
-      return (_a4 = props.clipboardOptions) != null ? _a4 : {};
+      var _a2;
+      return (_a2 = props.clipboardOptions) != null ? _a2 : {};
     },
     [props.clipboardOptions]
   );
   const config = (0, import_react.useMemo)(() => {
-    var _a4;
+    var _a2;
     const models = props.models && props.models.length > 0 ? props.models : DEFAULT_CONFIG.models;
     const statusSequence = props.statusSequence && props.statusSequence.length > 0 ? props.statusSequence : DEFAULT_CONFIG.statusSequence;
-    const endpoint = (_a4 = props.endpoint) != null ? _a4 : DEFAULT_CONFIG.endpoint;
+    const endpoint = (_a2 = props.endpoint) != null ? _a2 : DEFAULT_CONFIG.endpoint;
     return {
       endpoint,
       models,
@@ -908,7 +1380,7 @@ function FlowOverlayProvider(props = {}) {
   }, [props.endpoint, props.models, props.statusSequence]);
   const [chat, setChat] = (0, import_react.useState)(null);
   const abortControllerRef = (0, import_react.useRef)(null);
-  const fallbackStatusLabel = (_a3 = config.statusSequence[0]) != null ? _a3 : null;
+  const fallbackStatusLabel = (_a = config.statusSequence[0]) != null ? _a : null;
   (0, import_react.useEffect)(() => {
     if (props.enableClipboardInterceptor === false) {
       return;
@@ -917,12 +1389,12 @@ function FlowOverlayProvider(props = {}) {
     loadReactGrabRuntime({
       url: clipboardOptions.reactGrabUrl
     }).then(() => {
-      var _a4, _b2;
+      var _a2, _b;
       cleanup = registerClipboardInterceptor({
         projectRoot: clipboardOptions.projectRoot,
         highlightColor: clipboardOptions.highlightColor,
         highlightStyleId: clipboardOptions.highlightStyleId,
-        logClipboardEndpoint: (_b2 = (_a4 = clipboardOptions.logClipboardEndpoint) != null ? _a4 : process.env.SHIPFLOW_OVERLAY_LOG_ENDPOINT) != null ? _b2 : null,
+        logClipboardEndpoint: (_b = (_a2 = clipboardOptions.logClipboardEndpoint) != null ? _a2 : process.env.SHIPFLOW_OVERLAY_LOG_ENDPOINT) != null ? _b : null,
         reactGrabUrl: clipboardOptions.reactGrabUrl
       });
     }).catch((error) => {
@@ -966,16 +1438,16 @@ function FlowOverlayProvider(props = {}) {
   );
   useRecalculateRect(chat, setChat);
   useEscapeToClose(Boolean(chat), close);
-  useAutoFocus(Boolean(chat));
+  useAutoFocus(Boolean(chat), portalTarget);
   const sendToBackend = (0, import_react.useCallback)(
     async (payload) => {
-      var _a4, _b2;
+      var _a2, _b;
       const controller = new AbortController();
       abortControllerRef.current = controller;
       const promotePhase = (phase) => {
         const safePhase = Math.min(Math.max(phase, 0), config.statusSequence.length - 1);
         setChat((prev) => {
-          var _a5;
+          var _a3;
           if (!prev) return prev;
           if (prev.statusPhase === safePhase && prev.statusLabel) {
             return prev;
@@ -983,7 +1455,7 @@ function FlowOverlayProvider(props = {}) {
           return {
             ...prev,
             statusPhase: safePhase,
-            statusLabel: (_a5 = config.statusSequence[safePhase]) != null ? _a5 : fallbackStatusLabel
+            statusLabel: (_a3 = config.statusSequence[safePhase]) != null ? _a3 : fallbackStatusLabel
           };
         });
       };
@@ -998,9 +1470,9 @@ function FlowOverlayProvider(props = {}) {
         });
         if (!response.ok) {
           const data = await response.json().catch(() => null);
-          throw new Error((_a4 = data == null ? void 0 : data.error) != null ? _a4 : `Request failed with status ${response.status}`);
+          throw new Error((_a2 = data == null ? void 0 : data.error) != null ? _a2 : `Request failed with status ${response.status}`);
         }
-        const reader = (_b2 = response.body) == null ? void 0 : _b2.getReader();
+        const reader = (_b = response.body) == null ? void 0 : _b.getReader();
         if (!reader) {
           throw new Error("Streaming response is not supported in this environment.");
         }
@@ -1010,9 +1482,9 @@ function FlowOverlayProvider(props = {}) {
         let hasPromotedPlanning = false;
         let hasPromotedUpdating = false;
         const processEvent = (event) => {
-          var _a5, _b3, _c;
+          var _a3, _b2, _c;
           if (event.event === "status") {
-            const message = (_a5 = event.message) == null ? void 0 : _a5.trim();
+            const message = (_a3 = event.message) == null ? void 0 : _a3.trim();
             if (message) {
               if (!hasPromotedPlanning && /plan|analy/i.test(message)) {
                 promotePhase(1);
@@ -1036,7 +1508,7 @@ function FlowOverlayProvider(props = {}) {
             return;
           }
           if (event.event === "assistant") {
-            const chunk = (_b3 = event.text) == null ? void 0 : _b3.trim();
+            const chunk = (_b2 = event.text) == null ? void 0 : _b2.trim();
             if (chunk) {
               assistantSummary += chunk.endsWith("\n") ? chunk : `${chunk} `;
               if (!hasPromotedPlanning) {
@@ -1074,11 +1546,11 @@ function FlowOverlayProvider(props = {}) {
             } else {
               setChat(
                 (prev) => {
-                  var _a6;
+                  var _a4;
                   return prev ? {
                     ...prev,
                     status: "error",
-                    error: (_a6 = event.error) != null ? _a6 : "Cursor CLI reported an error.",
+                    error: (_a4 = event.error) != null ? _a4 : "Cursor CLI reported an error.",
                     statusAddonMode: "idle",
                     statusLabel: null,
                     statusContext: null,
@@ -1185,7 +1657,7 @@ function FlowOverlayProvider(props = {}) {
   const onSubmit = (0, import_react.useCallback)(() => {
     let payload = null;
     setChat((current) => {
-      var _a4, _b2;
+      var _a2, _b;
       if (!current) return current;
       if (current.status === "submitting") return current;
       const trimmed = current.instruction.trim();
@@ -1207,7 +1679,7 @@ function FlowOverlayProvider(props = {}) {
         htmlFrame: current.htmlFrame,
         stackTrace: current.codeLocation,
         instruction: trimmed,
-        model: current.model || ((_a4 = config.models[0]) == null ? void 0 : _a4.value) || ""
+        model: current.model || ((_a2 = config.models[0]) == null ? void 0 : _a2.value) || ""
       };
       return {
         ...current,
@@ -1216,7 +1688,7 @@ function FlowOverlayProvider(props = {}) {
         error: void 0,
         serverMessage: void 0,
         statusAddonMode: "progress",
-        statusLabel: (_b2 = config.statusSequence[0]) != null ? _b2 : fallbackStatusLabel,
+        statusLabel: (_b = config.statusSequence[0]) != null ? _b : fallbackStatusLabel,
         statusContext: "Preparing Cursor CLI request\u2026",
         summary: void 0,
         statusPhase: 0
@@ -1234,661 +1706,35 @@ function FlowOverlayProvider(props = {}) {
   const onModelChange = (0, import_react.useCallback)(
     (value) => {
       setChat((current) => {
-        var _a4, _b2;
+        var _a2, _b;
         if (!current || current.status === "submitting") {
           return current;
         }
-        const nextValue = config.models.some((option) => option.value === value) ? value : (_b2 = (_a4 = config.models[0]) == null ? void 0 : _a4.value) != null ? _b2 : "";
+        const nextValue = config.models.some((option) => option.value === value) ? value : (_b = (_a2 = config.models[0]) == null ? void 0 : _a2.value) != null ? _b : "";
         return { ...current, model: nextValue };
       });
     },
     [config.models]
   );
-  const bubble = chat ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-    Bubble,
-    {
-      chat,
-      onInstructionChange,
-      onSubmit,
-      onStop: stop,
-      onModelChange,
-      onClose: close,
-      modelOptions: config.models,
-      statusSequence: config.statusSequence
-    }
-  ) : null;
-  if (!bubble) return null;
-  return (0, import_react_dom.createPortal)(bubble, document.body);
-}
-
-// src/server/createNextHandler.ts
-var import_path2 = __toESM(require("path"), 1);
-var import_server = require("next/server");
-
-// src/server/cursorAgent.ts
-var import_child_process = require("child_process");
-var import_promises = require("fs/promises");
-var import_fs = require("fs");
-var import_path = __toESM(require("path"), 1);
-var LOG_PREFIX = "[shipflow-overlay]";
-var _a;
-var CURSOR_BINARY_HINT = (_a = process.env.CURSOR_AGENT_BIN) != null ? _a : "cursor-agent";
-var _a2, _b;
-var HOME_DIR = (_b = (_a2 = process.env.HOME) != null ? _a2 : process.env.USERPROFILE) != null ? _b : "";
-var cachedBinary = null;
-var cachedEnv = null;
-var resolvePromise = null;
-var IGNORED_STATUS_MESSAGES = /* @__PURE__ */ new Set(["User event"]);
-var WHITELISTED_STATUS_MESSAGES = /* @__PURE__ */ new Set([
-  "Initializing agent",
-  "Agent ready.",
-  "Thinking",
-  "Building changes",
-  "Analyzing project",
-  "Build step complete."
-]);
-var MIN_STATUS_LENGTH = 30;
-var STATUS_KEYS = ["text", "value", "delta", "message", "summary", "label"];
-var STREAM_HEADERS = {
-  "Content-Type": "application/x-ndjson; charset=utf-8",
-  "Cache-Control": "no-cache, no-transform"
-};
-var pathExistsAndExecutable = async (filePath) => {
-  if (!filePath) return false;
-  try {
-    await (0, import_promises.access)(filePath, import_fs.constants.X_OK);
-    return true;
-  } catch {
-    try {
-      await (0, import_promises.access)(filePath, import_fs.constants.F_OK);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-};
-var describeEvent = (event) => {
-  if (!event || typeof event !== "object") {
+  if (!portalTarget || !chat) {
     return null;
   }
-  const payload = event;
-  const type = typeof payload.type === "string" ? payload.type : null;
-  const subtype = typeof payload.subtype === "string" ? payload.subtype : null;
-  if (type === "system") {
-    if (subtype === "init") {
-      return "Initializing agent";
-    }
-    if (subtype === "progress" && typeof payload.message === "string") {
-      return payload.message;
-    }
-    if (subtype === "completed") {
-      return "Agent ready.";
-    }
-    return subtype ? `System update: ${subtype}` : "System update.";
-  }
-  if (type === "assistant") {
-    return "Thinking\u2026";
-  }
-  if (type === "tool_call") {
-    const toolName = typeof payload.tool === "object" && payload.tool && typeof payload.tool.name === "string" ? String(payload.tool.name) : "Tool";
-    const normalizedName = toolName.toLowerCase();
-    if (subtype === "started") {
-      if (normalizedName.includes("apply") || normalizedName.includes("write") || normalizedName.includes("patch") || normalizedName.includes("build")) {
-        return "Building changes\u2026";
+  return (0, import_react_dom.createPortal)(
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+      Bubble,
+      {
+        chat,
+        onInstructionChange,
+        onSubmit,
+        onStop: stop,
+        onModelChange,
+        onClose: close,
+        modelOptions: config.models,
+        statusSequence: config.statusSequence
       }
-      if (normalizedName.includes("plan") || normalizedName.includes("analy")) {
-        return "Analyzing project\u2026";
-      }
-      return `Running ${toolName}\u2026`;
-    }
-    if (subtype === "completed") {
-      if (normalizedName.includes("apply") || normalizedName.includes("write") || normalizedName.includes("patch") || normalizedName.includes("build")) {
-        return "Build step complete.";
-      }
-      return `${toolName} finished.`;
-    }
-    return `${toolName} ${subtype != null ? subtype : "update"}\u2026`;
-  }
-  if (type === "result") {
-    return "Finalizing changes\u2026";
-  }
-  if (type === "error") {
-    if (typeof payload.message === "string") {
-      return `Error: ${payload.message}`;
-    }
-    return "Cursor CLI reported an error.";
-  }
-  if (typeof payload.message === "string") {
-    return payload.message;
-  }
-  return type ? `Event: ${type}${subtype ? `/${subtype}` : ""}` : null;
-};
-var extractAssistantText = (input, seen = /* @__PURE__ */ new WeakSet()) => {
-  if (!input) return "";
-  if (typeof input === "string") {
-    return input;
-  }
-  if (Array.isArray(input)) {
-    return input.map((entry) => extractAssistantText(entry, seen)).join("");
-  }
-  if (typeof input === "object") {
-    if (seen.has(input)) return "";
-    seen.add(input);
-    const record = input;
-    let text = "";
-    for (const key of STATUS_KEYS) {
-      const value = record[key];
-      if (typeof value === "string") {
-        text += value;
-      } else if (value) {
-        text += extractAssistantText(value, seen);
-      }
-    }
-    if ("content" in record) {
-      text += extractAssistantText(record.content, seen);
-    }
-    if ("parts" in record) {
-      text += extractAssistantText(record.parts, seen);
-    }
-    if ("text_delta" in record) {
-      text += extractAssistantText(record.text_delta, seen);
-    }
-    return text;
-  }
-  return "";
-};
-var buildCandidateDirs = (binaryPath, additionalSearchDirs) => {
-  var _a3;
-  const candidateDirs = new Set(
-    ((_a3 = process.env.PATH) != null ? _a3 : "").split(import_path.default.delimiter).map((entry) => entry.trim()).filter(Boolean)
+    ),
+    portalTarget
   );
-  for (const dir of additionalSearchDirs) {
-    if (dir) {
-      candidateDirs.add(dir);
-    }
-  }
-  if (HOME_DIR) {
-    candidateDirs.add(import_path.default.join(HOME_DIR, ".cursor", "bin"));
-    candidateDirs.add(import_path.default.join(HOME_DIR, "Library", "Application Support", "Cursor", "bin"));
-    candidateDirs.add(import_path.default.join(HOME_DIR, "AppData", "Local", "Programs", "cursor", "bin"));
-  }
-  if (binaryPath && import_path.default.isAbsolute(binaryPath)) {
-    candidateDirs.add(import_path.default.dirname(binaryPath));
-  }
-  return Array.from(candidateDirs);
-};
-async function discoverCursorAgentBinary(options) {
-  var _a3, _b2;
-  const additionalSearchDirs = (_a3 = options.additionalSearchDirs) != null ? _a3 : [];
-  const logPrefix = (_b2 = options.logPrefix) != null ? _b2 : LOG_PREFIX;
-  const candidateNames = /* @__PURE__ */ new Set();
-  if (options.binaryPath) {
-    candidateNames.add(options.binaryPath);
-  }
-  if (CURSOR_BINARY_HINT) {
-    candidateNames.add(CURSOR_BINARY_HINT);
-  }
-  candidateNames.add("cursor-agent");
-  if (process.platform === "win32") {
-    candidateNames.add("cursor-agent.exe");
-  }
-  for (const name of candidateNames) {
-    if (!name) continue;
-    if (import_path.default.isAbsolute(name)) {
-      if (await pathExistsAndExecutable(name)) {
-        return {
-          binary: name,
-          env: null
-        };
-      }
-      continue;
-    }
-    const whichCommand = process.platform === "win32" ? "where" : "which";
-    const lookup = (0, import_child_process.spawnSync)(whichCommand, [name], { encoding: "utf8" });
-    if (!lookup.error && lookup.status === 0 && lookup.stdout) {
-      const resolvedPath = lookup.stdout.split(/\r?\n/).find(Boolean);
-      if (resolvedPath && await pathExistsAndExecutable(resolvedPath)) {
-        return {
-          binary: resolvedPath,
-          env: null
-        };
-      }
-    }
-    for (const dir of buildCandidateDirs(name, additionalSearchDirs)) {
-      const fullPath = import_path.default.join(dir, name);
-      if (await pathExistsAndExecutable(fullPath)) {
-        return {
-          binary: fullPath,
-          env: null
-        };
-      }
-    }
-  }
-  console.error(
-    `${logPrefix} cursor-agent binary not found. Set CURSOR_AGENT_BIN to an absolute path or add cursor-agent to your PATH.`
-  );
-  throw new Error(
-    "cursor-agent binary not found. Set CURSOR_AGENT_BIN to an absolute path or add cursor-agent to your PATH."
-  );
-}
-async function resolveCursorAgentBinary(options = {}) {
-  if (options.binaryPath) {
-    const normalized = options.binaryPath.trim();
-    if (normalized && await pathExistsAndExecutable(normalized)) {
-      return {
-        binary: normalized,
-        env: null
-      };
-    }
-  }
-  if (cachedBinary) {
-    return {
-      binary: cachedBinary,
-      env: cachedEnv
-    };
-  }
-  if (!resolvePromise) {
-    resolvePromise = discoverCursorAgentBinary(options).then((resolved) => {
-      var _a3, _b2;
-      cachedBinary = resolved.binary;
-      const extraDirs = [
-        ...(_a3 = options.additionalSearchDirs) != null ? _a3 : [],
-        import_path.default.dirname(resolved.binary)
-      ];
-      if (HOME_DIR) {
-        extraDirs.push(import_path.default.join(HOME_DIR, ".cursor", "bin"));
-        extraDirs.push(import_path.default.join(HOME_DIR, "Library", "Application Support", "Cursor", "bin"));
-        extraDirs.push(import_path.default.join(HOME_DIR, "AppData", "Local", "Programs", "cursor", "bin"));
-      }
-      const existingPath = (_b2 = process.env.PATH) != null ? _b2 : "";
-      const pathSegments = new Set(
-        existingPath.split(import_path.default.delimiter).map((segment) => segment.trim()).filter(Boolean)
-      );
-      for (const dir of extraDirs) {
-        if (dir) {
-          pathSegments.add(dir);
-        }
-      }
-      cachedEnv = {
-        ...process.env,
-        PATH: Array.from(pathSegments).join(import_path.default.delimiter)
-      };
-      return {
-        binary: resolved.binary,
-        env: cachedEnv
-      };
-    }).catch((error) => {
-      resolvePromise = null;
-      throw error;
-    });
-  }
-  return resolvePromise;
-}
-async function runCursorAgentStream(options, send) {
-  var _a3;
-  const logPrefix = (_a3 = options.logPrefix) != null ? _a3 : LOG_PREFIX;
-  await new Promise((resolve) => {
-    var _a4, _b2;
-    try {
-      const args = [
-        "--print",
-        "--force",
-        "--output-format",
-        "stream-json",
-        "--stream-partial-output",
-        "--model",
-        options.model,
-        options.prompt
-      ];
-      console.log(`${logPrefix} Spawning cursor-agent`, {
-        command: options.binary,
-        args,
-        cwd: process.cwd()
-      });
-      const child = (0, import_child_process.spawn)(options.binary, args, {
-        cwd: process.cwd(),
-        env: (_a4 = options.env) != null ? _a4 : process.env,
-        stdio: ["ignore", "pipe", "pipe"]
-      });
-      let stdoutBuffer = "";
-      let stderrAggregate = "";
-      let assistantSummary = "";
-      let settled = false;
-      const timeoutMs = typeof options.timeoutMs === "number" ? options.timeoutMs : Number((_b2 = process.env.SHIPFLOW_OVERLAY_AGENT_TIMEOUT_MS) != null ? _b2 : 4 * 60 * 1e3);
-      const sendStatus = (message) => {
-        if (!message) return;
-        send({ event: "status", message });
-      };
-      const appendAssistant = (text) => {
-        if (!text) return;
-        assistantSummary += text;
-        send({ event: "assistant", text });
-      };
-      const flushDone = (success, exitCode, error) => {
-        send({
-          event: "done",
-          success,
-          summary: assistantSummary.trim(),
-          exitCode,
-          error,
-          stderr: stderrAggregate.trim() || void 0
-        });
-      };
-      const processLine = (line) => {
-        if (!line.trim()) {
-          return;
-        }
-        try {
-          const parsed = JSON.parse(line);
-          const status = describeEvent(parsed);
-          if (status) {
-            const trimmed = status.trim();
-            const isWhitelisted = WHITELISTED_STATUS_MESSAGES.has(trimmed);
-            const isIgnored = IGNORED_STATUS_MESSAGES.has(trimmed);
-            const isLongEnough = trimmed.length >= MIN_STATUS_LENGTH;
-            if (!isIgnored && (isWhitelisted || isLongEnough)) {
-              sendStatus(trimmed);
-            }
-          }
-          if (typeof parsed.type === "string" && parsed.type === "assistant") {
-            const text = extractAssistantText(parsed);
-            appendAssistant(text);
-          }
-          if (typeof parsed.type === "string" && parsed.type === "result") {
-            const text = extractAssistantText(parsed);
-            appendAssistant(text);
-          }
-        } catch (error) {
-          console.warn(`${logPrefix} Failed to parse cursor-agent stream line`, {
-            line,
-            error
-          });
-          sendStatus(line);
-        }
-      };
-      const timeoutId = setTimeout(() => {
-        if (settled) return;
-        settled = true;
-        console.warn(`${logPrefix} cursor-agent exceeded timeout; terminating process`, {
-          timeoutMs
-        });
-        sendStatus(`Cursor CLI timed out after ${timeoutMs}ms; terminating process.`);
-        try {
-          child.kill("SIGTERM");
-        } catch (killError) {
-          console.warn(`${logPrefix} Failed to terminate cursor-agent process`, killError);
-        }
-        flushDone(false, null, `Cursor CLI timed out after ${timeoutMs}ms.`);
-        resolve();
-      }, timeoutMs);
-      child.stdout.on("data", (chunk) => {
-        const text = chunk.toString();
-        stdoutBuffer += text;
-        let newlineIndex = stdoutBuffer.indexOf("\n");
-        while (newlineIndex !== -1) {
-          const line = stdoutBuffer.slice(0, newlineIndex);
-          stdoutBuffer = stdoutBuffer.slice(newlineIndex + 1);
-          processLine(line);
-          newlineIndex = stdoutBuffer.indexOf("\n");
-        }
-      });
-      child.stderr.on("data", (chunk) => {
-        const text = chunk.toString();
-        stderrAggregate += text;
-        for (const line of text.split(/\r?\n/).map((entry) => entry.trim()).filter(Boolean)) {
-          sendStatus(`[stderr] ${line}`);
-        }
-        console.error(`${logPrefix} cursor-agent stderr:`, text);
-      });
-      child.on("error", (error) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timeoutId);
-        console.error(`${logPrefix} cursor-agent failed to start`, error);
-        flushDone(false, null, error instanceof Error ? error.message : "Failed to start Cursor CLI.");
-        resolve();
-      });
-      child.on("close", (exitCode) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timeoutId);
-        if (stdoutBuffer.trim()) {
-          processLine(stdoutBuffer);
-          stdoutBuffer = "";
-        }
-        console.log(`${logPrefix} cursor-agent exited`, { exitCode });
-        if (exitCode === 0) {
-          flushDone(true, exitCode != null ? exitCode : 0);
-        } else {
-          const error = stderrAggregate.trim() || `Cursor CLI exited with status ${exitCode != null ? exitCode : "unknown"}. Check server logs for details.`;
-          flushDone(false, exitCode != null ? exitCode : null, error);
-        }
-        resolve();
-      });
-    } catch (error) {
-      console.error(`${logPrefix} Unexpected error launching cursor-agent`, error);
-      send({
-        event: "done",
-        success: false,
-        summary: "",
-        exitCode: null,
-        error: error instanceof Error ? error.message : "Unexpected error launching Cursor CLI."
-      });
-      resolve();
-    }
-  });
-}
-
-// src/server/createNextHandler.ts
-var DEFAULT_MODEL = "composer-1";
-var STACK_TRACE_PATH_PATTERN = /([^\s()]+?\.(?:[jt]sx?|mdx?))/gi;
-var normalizeFilePath = (filePath) => {
-  if (!filePath) return null;
-  const trimmed = filePath.trim();
-  if (!trimmed) return null;
-  const webpackPrefix = "webpack-internal:///";
-  const filePrefix = "file://";
-  let sanitized = trimmed;
-  if (sanitized.startsWith(webpackPrefix)) {
-    sanitized = sanitized.slice(webpackPrefix.length);
-  }
-  if (sanitized.startsWith(filePrefix)) {
-    sanitized = sanitized.slice(filePrefix.length);
-  }
-  if (sanitized.startsWith("./")) {
-    sanitized = sanitized.slice(2);
-  }
-  if (!sanitized) {
-    return null;
-  }
-  const cwd = process.cwd();
-  if (pathIsAbsoluteSafe(sanitized)) {
-    const relative = relativeSafe(cwd, sanitized);
-    return relative.startsWith("..") ? sanitized : relative;
-  }
-  return sanitized;
-};
-var pathIsAbsoluteSafe = (target) => {
-  try {
-    return import_path2.default.isAbsolute(target);
-  } catch {
-    return false;
-  }
-};
-var relativeSafe = (from, to) => {
-  try {
-    return import_path2.default.relative(from, to);
-  } catch {
-    return to;
-  }
-};
-var extractFilePathFromStackTrace = (stackTrace) => {
-  if (!stackTrace) return null;
-  STACK_TRACE_PATH_PATTERN.lastIndex = 0;
-  let match;
-  while (match = STACK_TRACE_PATH_PATTERN.exec(stackTrace)) {
-    const rawCandidate = match[1];
-    if (typeof rawCandidate !== "string") {
-      continue;
-    }
-    let candidate = rawCandidate.trim();
-    if (!candidate) {
-      continue;
-    }
-    if (candidate.includes("node_modules/") || candidate.includes("node_modules\\")) {
-      continue;
-    }
-    if (candidate.startsWith("webpack-internal:///")) {
-      candidate = candidate.slice("webpack-internal:///".length);
-    }
-    if (candidate.startsWith("./")) {
-      candidate = candidate.slice(2);
-    }
-    if (!candidate) {
-      continue;
-    }
-    return candidate;
-  }
-  return null;
-};
-var buildPrompt = (filePath, htmlFrame, stackTrace, instruction) => {
-  const lines = [];
-  lines.push(`Open ${filePath}.`);
-  lines.push("Target the element matching this HTML:");
-  lines.push(htmlFrame != null ? htmlFrame : "(no HTML frame provided)");
-  lines.push("");
-  lines.push("and the component stack:");
-  lines.push(stackTrace != null ? stackTrace : "(no component stack provided)");
-  lines.push("");
-  lines.push(`User request: ${instruction}`);
-  return lines.join("\n");
-};
-var stripNullish = (record) => Object.fromEntries(
-  Object.entries(record).filter(([, value]) => value !== void 0 && value !== null)
-);
-var isEnabled = (options) => {
-  if (options.allowInProduction) {
-    return true;
-  }
-  const envFlag = process.env.SHIPFLOW_OVERLAY_ENABLED;
-  if (envFlag && ["true", "1", "on", "yes"].includes(envFlag.toLowerCase())) {
-    return true;
-  }
-  return process.env.NODE_ENV === "development";
-};
-function createNextHandler(options = {}) {
-  var _a3;
-  const logPrefix = (_a3 = options.logPrefix) != null ? _a3 : "[shipflow-overlay]";
-  return async function handler(request) {
-    var _a4, _b2;
-    if (!isEnabled(options)) {
-      return import_server.NextResponse.json(
-        { error: "Shipflow overlay workflow is only available in development." },
-        { status: 403 }
-      );
-    }
-    let payload;
-    try {
-      payload = await request.json();
-    } catch {
-      return import_server.NextResponse.json({ error: "Invalid JSON payload." }, { status: 400 });
-    }
-    const instruction = (_a4 = payload.instruction) == null ? void 0 : _a4.trim();
-    if (!instruction) {
-      return import_server.NextResponse.json({ error: "Instruction is required." }, { status: 400 });
-    }
-    const directFilePath = normalizeFilePath(payload.filePath);
-    const derivedFilePath = directFilePath != null ? directFilePath : payload.filePath ? null : normalizeFilePath(extractFilePathFromStackTrace(payload.stackTrace));
-    const normalizedFilePath = derivedFilePath;
-    if (!normalizedFilePath) {
-      return import_server.NextResponse.json(
-        { error: "Unable to determine target file path from stack trace." },
-        { status: 400 }
-      );
-    }
-    const prompt = buildPrompt(normalizedFilePath, payload.htmlFrame, payload.stackTrace, instruction);
-    const model = ((_b2 = payload.model) == null ? void 0 : _b2.trim()) || options.defaultModel || DEFAULT_MODEL;
-    try {
-      const resolved = await resolveCursorAgentBinary(
-        stripNullish({
-          binaryPath: options.cursorAgentBinary,
-          additionalSearchDirs: options.additionalSearchDirs,
-          logPrefix
-        })
-      );
-      const encoder = new TextEncoder();
-      const stream = new ReadableStream({
-        async start(controller) {
-          const state = { isClosed: false };
-          const send = (event) => {
-            if (state.isClosed) {
-              return;
-            }
-            try {
-              controller.enqueue(encoder.encode(`${JSON.stringify(event)}
-`));
-            } catch (error) {
-              if (error instanceof TypeError && (error.message.includes("closed") || error.message.includes("Invalid state"))) {
-                state.isClosed = true;
-              }
-            }
-          };
-          request.signal.addEventListener("abort", () => {
-            state.isClosed = true;
-            try {
-              controller.close();
-            } catch {
-            }
-          });
-          send({ event: "status", message: "Understanding user intent" });
-          try {
-            await runCursorAgentStream(
-              {
-                binary: resolved.binary,
-                model,
-                prompt,
-                timeoutMs: options.timeoutMs,
-                logPrefix,
-                env: resolved.env
-              },
-              send
-            );
-          } catch (error) {
-            if (state.isClosed) {
-              return;
-            }
-            console.error(`${logPrefix} Failed during Cursor CLI streaming`, error);
-            send({
-              event: "done",
-              success: false,
-              summary: "",
-              exitCode: null,
-              error: error instanceof Error ? error.message : "Unexpected error streaming from Cursor CLI."
-            });
-          } finally {
-            if (!state.isClosed) {
-              try {
-                controller.close();
-              } catch {
-              }
-              state.isClosed = true;
-            }
-          }
-        }
-      });
-      return new import_server.NextResponse(stream, {
-        headers: STREAM_HEADERS
-      });
-    } catch (error) {
-      console.error(`${logPrefix} Failed to run cursor-agent`, error);
-      return import_server.NextResponse.json(
-        {
-          error: error instanceof Error ? error.message : "Failed to invoke Cursor CLI. Ensure cursor-agent is installed and available on PATH."
-        },
-        { status: 500 }
-      );
-    }
-  };
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
@@ -1896,7 +1742,6 @@ function createNextHandler(options = {}) {
   DEFAULT_STATUS_SEQUENCE,
   FlowOverlayProvider,
   Typewriter,
-  createNextHandler,
   loadReactGrabRuntime,
   registerClipboardInterceptor
 });

@@ -455,7 +455,16 @@ async function runCursorAgentStream(options, send) {
 
 // src/server/createNextHandler.ts
 var DEFAULT_MODEL = "composer-1";
-var STACK_TRACE_PATH_PATTERN = /([^\s()]+?\.(?:[jt]sx?|mdx?))/gi;
+var STACK_TRACE_PATTERNS = [
+  // Format: "in Component (path/to/file.tsx:10:5)" or "at Component (path/to/file.tsx:10:5)"
+  /\b(?:in|at)\s+\S+\s*\(([^()]+?\.(?:[jt]sx?|mdx?))(?::\d+)*\)/gi,
+  // Format: "in path/to/file.tsx" or "at path/to/file.tsx"
+  /\b(?:in|at)\s+((?:[A-Za-z]:)?[^\s:()]+?\.(?:[jt]sx?|mdx?))/gi,
+  // Format: just "(path/to/file.tsx:10:5)" in parentheses
+  /\(([^()]+?\.(?:[jt]sx?|mdx?))(?::\d+)*\)/gi,
+  // Format: bare path like "app/page.tsx" without surrounding context
+  /(?:^|\s)((?:\.\/)?(?:[A-Za-z]:)?[^\s:()]+?\.(?:[jt]sx?|mdx?))/gim
+];
 var normalizeFilePath = (filePath) => {
   if (!filePath) return null;
   const trimmed = filePath.trim();
@@ -498,30 +507,36 @@ var relativeSafe = (from, to) => {
 };
 var extractFilePathFromStackTrace = (stackTrace) => {
   if (!stackTrace) return null;
-  STACK_TRACE_PATH_PATTERN.lastIndex = 0;
-  let match;
-  while (match = STACK_TRACE_PATH_PATTERN.exec(stackTrace)) {
-    const rawCandidate = match[1];
-    if (typeof rawCandidate !== "string") {
-      continue;
+  for (const pattern of STACK_TRACE_PATTERNS) {
+    pattern.lastIndex = 0;
+    let match;
+    while (match = pattern.exec(stackTrace)) {
+      const rawCandidate = match[1];
+      if (typeof rawCandidate !== "string") {
+        continue;
+      }
+      let candidate = rawCandidate.trim();
+      if (!candidate) {
+        continue;
+      }
+      if (candidate.includes("node_modules/") || candidate.includes("node_modules\\")) {
+        continue;
+      }
+      if (candidate.includes("://")) {
+        continue;
+      }
+      if (candidate.startsWith("webpack-internal:///")) {
+        candidate = candidate.slice("webpack-internal:///".length);
+      }
+      if (candidate.startsWith("./")) {
+        candidate = candidate.slice(2);
+      }
+      candidate = candidate.replace(/:\d+(?::\d+)?$/, "");
+      if (!candidate) {
+        continue;
+      }
+      return candidate;
     }
-    let candidate = rawCandidate.trim();
-    if (!candidate) {
-      continue;
-    }
-    if (candidate.includes("node_modules/") || candidate.includes("node_modules\\")) {
-      continue;
-    }
-    if (candidate.startsWith("webpack-internal:///")) {
-      candidate = candidate.slice("webpack-internal:///".length);
-    }
-    if (candidate.startsWith("./")) {
-      candidate = candidate.slice(2);
-    }
-    if (!candidate) {
-      continue;
-    }
-    return candidate;
   }
   return null;
 };
@@ -554,7 +569,7 @@ function createNextHandler(options = {}) {
   var _a3;
   const logPrefix = (_a3 = options.logPrefix) != null ? _a3 : "[shipflow-overlay]";
   return async function handler(request) {
-    var _a4, _b2;
+    var _a4, _b2, _c, _d, _e;
     if (!isEnabled(options)) {
       return import_server.NextResponse.json(
         { error: "Shipflow overlay workflow is only available in development." },
@@ -575,13 +590,19 @@ function createNextHandler(options = {}) {
     const derivedFilePath = directFilePath != null ? directFilePath : payload.filePath ? null : normalizeFilePath(extractFilePathFromStackTrace(payload.stackTrace));
     const normalizedFilePath = derivedFilePath;
     if (!normalizedFilePath) {
+      const truncatedStack = (_c = (_b2 = payload.stackTrace) == null ? void 0 : _b2.slice(0, 200)) != null ? _c : "(none)";
+      console.warn(
+        `${logPrefix} Could not extract file path. filePath: ${(_d = payload.filePath) != null ? _d : "(null)"}, stackTrace snippet: ${truncatedStack}`
+      );
       return import_server.NextResponse.json(
-        { error: "Unable to determine target file path from stack trace." },
+        {
+          error: "Unable to determine target file path. Make sure you're selecting an element from your project (not from node_modules)."
+        },
         { status: 400 }
       );
     }
     const prompt = buildPrompt(normalizedFilePath, payload.htmlFrame, payload.stackTrace, instruction);
-    const model = ((_b2 = payload.model) == null ? void 0 : _b2.trim()) || options.defaultModel || DEFAULT_MODEL;
+    const model = ((_e = payload.model) == null ? void 0 : _e.trim()) || options.defaultModel || DEFAULT_MODEL;
     try {
       const resolved = await resolveCursorAgentBinary(
         stripNullish({

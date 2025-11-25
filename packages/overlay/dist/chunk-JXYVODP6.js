@@ -74,13 +74,27 @@ function parseClipboard(text) {
   return { htmlFrame, codeLocation };
 }
 function extractFilePath(stack) {
+  var _a;
   if (typeof stack !== "string") return null;
-  const pathRegex = /\b(?:in\s+|at\s+)((?:[A-Za-z]:)?\/?[^:\s)]+?\.(?:[jt]sx?|mdx?))/g;
-  let match = null;
-  while (match = pathRegex.exec(stack)) {
-    const candidate = match[1];
-    if (candidate) {
-      return candidate.trim();
+  const patterns = [
+    // Format: "in Component (path/to/file.tsx:10:5)" or "at Component (path/to/file.tsx:10:5)"
+    /\b(?:in|at)\s+\S+\s*\(([^()]+?\.(?:[jt]sx?|mdx?))(?::\d+)*\)/gi,
+    // Format: "in path/to/file.tsx" or "at path/to/file.tsx"
+    /\b(?:in|at)\s+((?:[A-Za-z]:)?[^\s:()]+?\.(?:[jt]sx?|mdx?))/gi,
+    // Format: just "(path/to/file.tsx:10:5)" in parentheses
+    /\(([^()]+?\.(?:[jt]sx?|mdx?))(?::\d+)*\)/gi,
+    // Format: bare path like "app/page.tsx" or "./app/page.tsx"
+    /(?:^|\s)((?:\.\/)?(?:[A-Za-z]:)?[^\s:()]+?\.(?:[jt]sx?|mdx?))/gim
+  ];
+  for (const pattern of patterns) {
+    pattern.lastIndex = 0;
+    let match = null;
+    while (match = pattern.exec(stack)) {
+      const candidate = (_a = match[1]) == null ? void 0 : _a.trim();
+      if (!candidate) continue;
+      if (candidate.includes("node_modules")) continue;
+      if (candidate.includes("://")) continue;
+      return candidate;
     }
   }
   return null;
@@ -286,4 +300,4 @@ export {
   loadReactGrabRuntime,
   registerClipboardInterceptor
 };
-//# sourceMappingURL=chunk-RQXM4WWG.js.map
+//# sourceMappingURL=chunk-JXYVODP6.js.map

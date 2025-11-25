@@ -23,7 +23,17 @@ export type ShipflowOverlayServerOptions = {
 };
 
 const DEFAULT_MODEL = "composer-1";
-const STACK_TRACE_PATH_PATTERN = /([^\s()]+?\.(?:[jt]sx?|mdx?))/gi;
+// Multiple patterns to extract file paths from various stack trace formats
+const STACK_TRACE_PATTERNS = [
+  // Format: "in Component (path/to/file.tsx:10:5)" or "at Component (path/to/file.tsx:10:5)"
+  /\b(?:in|at)\s+\S+\s*\(([^()]+?\.(?:[jt]sx?|mdx?))(?::\d+)*\)/gi,
+  // Format: "in path/to/file.tsx" or "at path/to/file.tsx"
+  /\b(?:in|at)\s+((?:[A-Za-z]:)?[^\s:()]+?\.(?:[jt]sx?|mdx?))/gi,
+  // Format: just "(path/to/file.tsx:10:5)" in parentheses
+  /\(([^()]+?\.(?:[jt]sx?|mdx?))(?::\d+)*\)/gi,
+  // Format: bare path like "app/page.tsx" without surrounding context
+  /(?:^|\s)((?:\.\/)?(?:[A-Za-z]:)?[^\s:()]+?\.(?:[jt]sx?|mdx?))/gim,
+];
 
 const normalizeFilePath = (filePath: string | null) => {
   if (!filePath) return null;
@@ -75,37 +85,51 @@ const relativeSafe = (from: string, to: string) => {
 const extractFilePathFromStackTrace = (stackTrace: string | null) => {
   if (!stackTrace) return null;
 
-  STACK_TRACE_PATH_PATTERN.lastIndex = 0;
-  let match: RegExpExecArray | null;
+  // Try each pattern in order of specificity
+  for (const pattern of STACK_TRACE_PATTERNS) {
+    pattern.lastIndex = 0;
+    let match: RegExpExecArray | null;
 
-  while ((match = STACK_TRACE_PATH_PATTERN.exec(stackTrace))) {
-    const rawCandidate = match[1];
-    if (typeof rawCandidate !== "string") {
-      continue;
+    while ((match = pattern.exec(stackTrace))) {
+      const rawCandidate = match[1];
+      if (typeof rawCandidate !== "string") {
+        continue;
+      }
+
+      let candidate = rawCandidate.trim();
+      if (!candidate) {
+        continue;
+      }
+
+      // Skip node_modules paths
+      if (candidate.includes("node_modules/") || candidate.includes("node_modules\\")) {
+        continue;
+      }
+
+      // Skip URLs
+      if (candidate.includes("://")) {
+        continue;
+      }
+
+      // Clean up webpack prefixes
+      if (candidate.startsWith("webpack-internal:///")) {
+        candidate = candidate.slice("webpack-internal:///".length);
+      }
+
+      // Clean up relative path prefix
+      if (candidate.startsWith("./")) {
+        candidate = candidate.slice(2);
+      }
+
+      // Strip line/column numbers at the end (e.g., ":10:5")
+      candidate = candidate.replace(/:\d+(?::\d+)?$/, "");
+
+      if (!candidate) {
+        continue;
+      }
+
+      return candidate;
     }
-
-    let candidate = rawCandidate.trim();
-    if (!candidate) {
-      continue;
-    }
-
-    if (candidate.includes("node_modules/") || candidate.includes("node_modules\\")) {
-      continue;
-    }
-
-    if (candidate.startsWith("webpack-internal:///")) {
-      candidate = candidate.slice("webpack-internal:///".length);
-    }
-
-    if (candidate.startsWith("./")) {
-      candidate = candidate.slice(2);
-    }
-
-    if (!candidate) {
-      continue;
-    }
-
-    return candidate;
   }
 
   return null;
@@ -177,8 +201,15 @@ export function createNextHandler(options: ShipflowOverlayServerOptions = {}) {
     const normalizedFilePath = derivedFilePath;
 
     if (!normalizedFilePath) {
+      const truncatedStack = payload.stackTrace?.slice(0, 200) ?? "(none)";
+      console.warn(
+        `${logPrefix} Could not extract file path. filePath: ${payload.filePath ?? "(null)"}, stackTrace snippet: ${truncatedStack}`,
+      );
       return NextResponse.json(
-        { error: "Unable to determine target file path from stack trace." },
+        {
+          error:
+            "Unable to determine target file path. Make sure you're selecting an element from your project (not from node_modules).",
+        },
         { status: 400 },
       );
     }
@@ -284,3 +315,6 @@ export function createNextHandler(options: ShipflowOverlayServerOptions = {}) {
     }
   };
 }
+
+
+

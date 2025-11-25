@@ -57,14 +57,33 @@ function parseClipboard(text: string): ClipboardParseResult {
 
 function extractFilePath(stack: string | null): string | null {
   if (typeof stack !== "string") return null;
-  const pathRegex = /\b(?:in\s+|at\s+)((?:[A-Za-z]:)?\/?[^:\s)]+?\.(?:[jt]sx?|mdx?))/g;
-  let match: RegExpExecArray | null = null;
-  while ((match = pathRegex.exec(stack))) {
-    const candidate = match[1];
-    if (candidate) {
-      return candidate.trim();
+
+  // Try multiple patterns to handle different formats from react-grab
+  const patterns = [
+    // Format: "in Component (path/to/file.tsx:10:5)" or "at Component (path/to/file.tsx:10:5)"
+    /\b(?:in|at)\s+\S+\s*\(([^()]+?\.(?:[jt]sx?|mdx?))(?::\d+)*\)/gi,
+    // Format: "in path/to/file.tsx" or "at path/to/file.tsx"
+    /\b(?:in|at)\s+((?:[A-Za-z]:)?[^\s:()]+?\.(?:[jt]sx?|mdx?))/gi,
+    // Format: just "(path/to/file.tsx:10:5)" in parentheses
+    /\(([^()]+?\.(?:[jt]sx?|mdx?))(?::\d+)*\)/gi,
+    // Format: bare path like "app/page.tsx" or "./app/page.tsx"
+    /(?:^|\s)((?:\.\/)?(?:[A-Za-z]:)?[^\s:()]+?\.(?:[jt]sx?|mdx?))/gim,
+  ];
+
+  for (const pattern of patterns) {
+    pattern.lastIndex = 0;
+    let match: RegExpExecArray | null = null;
+    while ((match = pattern.exec(stack))) {
+      const candidate = match[1]?.trim();
+      if (!candidate) continue;
+      // Skip node_modules paths
+      if (candidate.includes("node_modules")) continue;
+      // Skip if it looks like a URL
+      if (candidate.includes("://")) continue;
+      return candidate;
     }
   }
+
   return null;
 }
 
@@ -317,3 +336,6 @@ export function registerClipboardInterceptor(
   (window as unknown as Record<string, () => void>)[GLOBAL_KEY] = cleanup;
   return cleanup;
 }
+
+
+

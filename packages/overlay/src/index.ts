@@ -17,8 +17,8 @@ export type {
   ShipflowOverlayConfig,
   StatusSequence,
 } from "./runtime/types";
-export {
-  createNextHandler,
-  type ShipflowOverlayServerOptions,
-  type ShipflowOverlayRequestPayload,
-} from "./server/createNextHandler";
+// Server exports (createNextHandler) are only available via @shipflow/overlay/next
+// to avoid bundling Node.js modules (child_process, fs) into client code
+
+
+

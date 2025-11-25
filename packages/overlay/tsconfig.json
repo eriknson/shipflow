@@ -1,5 +1,4 @@
 {
-  "extends": "../../tsconfig.json",
   "compilerOptions": {
     "baseUrl": "./src",
     "outDir": "./dist",
@@ -13,9 +12,12 @@
     "skipLibCheck": true,
     "target": "es2019",
     "noEmit": false,
-    "incremental": false
+    "incremental": false,
+    "strict": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "lib": ["DOM", "DOM.Iterable", "ES2019"]
   },
-  "include": [
-    "./src/**/*"
-  ]
+  "include": ["./src/**/*"]
 }
+

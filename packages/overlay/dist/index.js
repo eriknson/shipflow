@@ -1,10 +1,7 @@
 import {
-  createNextHandler
-} from "./chunk-CWEC2JE4.js";
-import {
   loadReactGrabRuntime,
   registerClipboardInterceptor
-} from "./chunk-RQXM4WWG.js";
+} from "./chunk-JXYVODP6.js";
 
 // src/runtime/FlowOverlay.tsx
 import {
@@ -17,13 +14,6 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { ArrowUp, Square, Command } from "lucide-react";
-
-// src/runtime/cn.ts
-import { clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
-function cn(...inputs) {
-  return twMerge(clsx(inputs));
-}
 
 // src/runtime/constants.ts
 var DEFAULT_STATUS_SEQUENCE = [
@@ -41,6 +31,447 @@ var DEFAULT_MODEL_OPTIONS = [
 // src/runtime/FlowOverlay.tsx
 import { Fragment, jsx, jsxs } from "react/jsx-runtime";
 var HIGHLIGHT_QUERY = "[data-react-grab-chat-highlighted='true']";
+var OVERLAY_STYLE_ID = "shipflow-overlay-styles";
+var OVERLAY_ROOT_ID = "shipflow-overlay-root";
+var ensureOverlayStyles = (root) => {
+  var _a, _b, _c;
+  if ("getElementById" in root && root.getElementById(OVERLAY_STYLE_ID)) {
+    return;
+  }
+  const style = document.createElement("style");
+  style.id = OVERLAY_STYLE_ID;
+  style.textContent = `
+:host {
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  line-height: 1.5;
+  color: var(--sf-text);
+  font-size: 14px;
+  --sf-bg: rgba(250, 250, 250, 0.7);
+  --sf-border: rgba(229, 229, 229, 0.5);
+  --sf-text: #171717;
+  --sf-muted-text: #6b7280;
+  --sf-placeholder: #9ca3af;
+  --sf-inline-bg: rgba(212, 212, 212, 0.6);
+  --sf-inline-hover-bg: rgba(212, 212, 212, 0.85);
+  --sf-inline-text: #4b5563;
+  --sf-inline-disabled-opacity: 0.5;
+  --sf-select-bg: transparent;
+  --sf-select-hover-bg: rgba(212, 212, 212, 0.25);
+  --sf-select-text: #4b5563;
+  --sf-focus-ring: rgba(212, 212, 212, 0.5);
+  --sf-submit-bg: #171717;
+  --sf-submit-hover-bg: #262626;
+  --sf-submit-text: #ffffff;
+  --sf-status-bg: rgba(245, 245, 245, 0.45);
+  --sf-status-border: rgba(229, 229, 229, 0.3);
+  --sf-error-bg: rgba(254, 242, 242, 0.6);
+  --sf-error-border: rgba(254, 202, 202, 0.5);
+  --sf-error-text: #dc2626;
+  --sf-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  --sf-body-gap: 0.5rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :host {
+    --sf-bg: rgba(23, 23, 23, 0.75);
+    --sf-border: rgba(64, 64, 64, 0.5);
+    --sf-text: #f5f5f5;
+    --sf-muted-text: #a3a3a3;
+    --sf-placeholder: #737373;
+    --sf-inline-bg: rgba(64, 64, 64, 0.5);
+    --sf-inline-hover-bg: rgba(64, 64, 64, 0.8);
+    --sf-inline-text: #e5e5e5;
+    --sf-select-bg: transparent;
+    --sf-select-hover-bg: rgba(64, 64, 64, 0.3);
+    --sf-select-text: #a3a3a3;
+    --sf-focus-ring: rgba(64, 64, 64, 0.5);
+    --sf-submit-bg: #f5f5f5;
+    --sf-submit-hover-bg: #e5e5e5;
+    --sf-submit-text: #111827;
+    --sf-status-bg: rgba(23, 23, 23, 0.35);
+    --sf-status-border: rgba(64, 64, 64, 0.4);
+    --sf-error-bg: rgba(239, 68, 68, 0.18);
+    --sf-error-border: rgba(239, 68, 68, 0.35);
+    --sf-error-text: #fecaca;
+    --sf-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+  }
+}
+
+:host([data-theme="dark"]),
+:host-context(.dark) {
+  --sf-bg: rgba(23, 23, 23, 0.75);
+  --sf-border: rgba(64, 64, 64, 0.5);
+  --sf-text: #f5f5f5;
+  --sf-muted-text: #a3a3a3;
+  --sf-placeholder: #737373;
+  --sf-inline-bg: rgba(64, 64, 64, 0.5);
+  --sf-inline-hover-bg: rgba(64, 64, 64, 0.8);
+  --sf-inline-text: #e5e5e5;
+  --sf-select-bg: rgba(38, 38, 38, 0.6);
+  --sf-select-hover-bg: rgba(38, 38, 38, 0.8);
+  --sf-select-text: #d4d4d4;
+  --sf-focus-ring: rgba(64, 64, 64, 0.5);
+  --sf-submit-bg: #f5f5f5;
+  --sf-submit-hover-bg: #e5e5e5;
+  --sf-submit-text: #111827;
+  --sf-status-bg: rgba(23, 23, 23, 0.35);
+  --sf-status-border: rgba(64, 64, 64, 0.4);
+  --sf-error-bg: rgba(239, 68, 68, 0.18);
+  --sf-error-border: rgba(239, 68, 68, 0.35);
+  --sf-error-text: #fecaca;
+  --sf-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+}
+
+:host *,
+:host *::before,
+:host *::after {
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+[data-react-grab-chat-bubble="true"] {
+  position: fixed;
+  z-index: 2147483647;
+  display: flex;
+  width: 100%;
+  max-width: 400px;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid var(--sf-border);
+  background: var(--sf-bg);
+  color: var(--sf-text);
+  box-shadow: var(--sf-shadow);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  animation: shipflow-fade-in 120ms ease-out;
+  pointer-events: auto;
+}
+
+[data-sf-body="true"] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-body-gap);
+  padding: 12px;
+}
+
+[data-sf-body="true"][data-expanded="false"] {
+  --sf-body-gap: 0;
+}
+
+[data-sf-row="input"] {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+[data-sf-input="true"] {
+  width: 100%;
+  resize: none;
+  border: none;
+  background: transparent;
+  color: var(--sf-text);
+  font-size: 0.875rem;
+  line-height: 1.6;
+  padding-right: 2.5rem;
+  outline: none;
+}
+
+[data-sf-input="true"][data-expanded="true"] {
+  padding-right: 0;
+}
+
+[data-sf-input="true"]::placeholder {
+  color: var(--sf-placeholder);
+}
+
+[data-sf-input="true"][disabled] {
+  opacity: 0.6;
+}
+
+[data-sf-inline-submit="true"] {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 2rem;
+  width: 2rem;
+  border-radius: 9999px;
+  background: var(--sf-inline-bg);
+  color: var(--sf-inline-text);
+  border: none;
+  cursor: pointer;
+  transition: background-color 150ms ease, transform 150ms ease, opacity 150ms ease;
+}
+
+[data-sf-inline-submit="true"]:hover:not([disabled]) {
+  background: var(--sf-inline-hover-bg);
+}
+
+[data-sf-inline-submit="true"][disabled] {
+  opacity: var(--sf-inline-disabled-opacity);
+  cursor: default;
+}
+
+[data-sf-toolbar="true"] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+[data-sf-select-wrapper="true"] {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+[data-sf-select="true"] {
+  height: 2rem;
+  appearance: none;
+  border-radius: 8px;
+  border: none;
+  background: var(--sf-select-bg);
+  color: var(--sf-select-text);
+  padding: 0 26px 0 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 150ms ease, box-shadow 150ms ease;
+}
+
+[data-sf-select="true"]:hover:not([disabled]) {
+  background: var(--sf-select-hover-bg);
+}
+
+[data-sf-select="true"]:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--sf-focus-ring);
+}
+
+[data-sf-select="true"][disabled] {
+  opacity: 0.55;
+  cursor: default;
+}
+
+[data-sf-select-chevron="true"] {
+  position: absolute;
+  pointer-events: none;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--sf-placeholder);
+}
+
+[data-sf-submit="true"] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 2rem;
+  width: 2rem;
+  border-radius: 9999px;
+  border: none;
+  cursor: pointer;
+  background: var(--sf-submit-bg);
+  color: var(--sf-submit-text);
+  transition: transform 150ms ease, background-color 150ms ease, opacity 150ms ease;
+}
+
+[data-sf-submit="true"]:hover:not([disabled]) {
+  background: var(--sf-submit-hover-bg);
+  transform: scale(1.05);
+}
+
+[data-sf-submit="true"][disabled] {
+  opacity: 0.65;
+  cursor: default;
+  transform: scale(1);
+}
+
+[data-sf-submit="true"][data-hidden="true"] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+[data-sf-status="true"] {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 1px solid var(--sf-status-border);
+  background: var(--sf-status-bg);
+  padding: 10px 12px;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+[data-sf-status="true"][data-mode="progress"] {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--sf-muted-text);
+}
+
+[data-sf-status-header="true"] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+[data-sf-status-label="true"] {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  font-size: 0.75rem;
+  color: var(--sf-muted-text);
+  flex-shrink: 0;
+}
+
+[data-sf-status-context="true"] {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: right;
+  color: var(--sf-muted-text);
+  font-size: 0.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-sf-status="true"][data-mode="summary"] {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--sf-muted-text);
+}
+
+[data-sf-status="true"][data-mode="summary"] [data-sf-status-header="true"] {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+[data-sf-status="true"][data-mode="summary"] [data-sf-undo="true"] {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: transparent;
+  color: var(--sf-muted-text);
+  cursor: pointer;
+  padding: 0;
+  font-size: 0.75rem;
+  transition: color 120ms ease;
+}
+
+[data-sf-status="true"][data-mode="summary"] [data-sf-undo="true"]:hover {
+  color: var(--sf-text);
+}
+
+[data-sf-undo-wrapper="true"] {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+[data-sf-undo="true"] svg {
+  width: 12px;
+  height: 12px;
+}
+
+[data-sf-error="true"] {
+  border-top: 1px solid var(--sf-error-border);
+  background: var(--sf-error-bg);
+  color: var(--sf-error-text);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 10px 12px;
+}
+
+[data-sf-icon="cursor"] {
+  width: 14px;
+  height: 14px;
+}
+
+[data-sf-icon="cursor"][data-loading="true"] {
+  animation: shipflow-pulse 1.5s ease-in-out infinite;
+}
+
+[data-sf-inline-submit="true"] svg,
+[data-sf-submit="true"] svg {
+  width: 14px;
+  height: 14px;
+}
+
+[data-sf-submit="true"][data-submitting="true"] svg {
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+}
+
+[data-sf-shimmer="true"] {
+  background: linear-gradient(90deg, var(--sf-muted-text), transparent, var(--sf-muted-text));
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shipflow-shimmer 2.4s linear infinite;
+  opacity: 0.75;
+}
+
+@keyframes shipflow-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shipflow-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes shipflow-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 0.25; }
+}
+`;
+  const target = root instanceof Document ? (_c = (_b = (_a = root.head) != null ? _a : root.body) != null ? _b : root.documentElement) != null ? _c : root : root;
+  target.appendChild(style);
+};
+var getOrCreateOverlayMount = () => {
+  var _a;
+  if (typeof document === "undefined") {
+    return null;
+  }
+  let container = document.getElementById(OVERLAY_ROOT_ID);
+  if (!container) {
+    container = document.createElement("div");
+    container.id = OVERLAY_ROOT_ID;
+    container.style.position = "fixed";
+    container.style.top = "0";
+    container.style.left = "0";
+    container.style.width = "0";
+    container.style.height = "0";
+    container.style.zIndex = "2147483646";
+    document.body.appendChild(container);
+  }
+  let root;
+  if (typeof container.attachShadow === "function") {
+    root = (_a = container.shadowRoot) != null ? _a : container.attachShadow({ mode: "open" });
+  } else {
+    root = container;
+  }
+  return { container, root };
+};
 var EVENT_OPEN = "react-grab-chat:open";
 var EVENT_CLOSE = "react-grab-chat:close";
 var EVENT_UNDO = "react-grab-chat:undo";
@@ -80,12 +511,13 @@ var createInitialState = (models, statusSequence) => {
     summary: void 0
   };
 };
-function CursorIcon({ className }) {
+function CursorIcon({ loading }) {
   return /* @__PURE__ */ jsxs(
     "svg",
     {
       viewBox: "0 0 466.73 533.32",
-      className,
+      "data-sf-icon": "cursor",
+      "data-loading": loading ? "true" : void 0,
       xmlns: "http://www.w3.org/2000/svg",
       shapeRendering: "geometricPrecision",
       children: [
@@ -172,29 +604,32 @@ function useEscapeToClose(isOpen, onClose) {
     return () => window.removeEventListener("keydown", handler, true);
   }, [isOpen, onClose]);
 }
-function useAutoFocus(isOpen) {
+function useAutoFocus(isOpen, shadowRoot) {
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || !shadowRoot) return;
     const frame = requestAnimationFrame(() => {
-      const textarea = document.querySelector(
+      const root = shadowRoot instanceof ShadowRoot ? shadowRoot : document;
+      const textarea = root.querySelector(
         "[data-react-grab-chat-input='true']"
       );
       textarea == null ? void 0 : textarea.focus();
-      textarea == null ? void 0 : textarea.select();
     });
     return () => cancelAnimationFrame(frame);
-  }, [isOpen]);
+  }, [isOpen, shadowRoot]);
 }
 function useClickOutside(ref, isOpen, onClose) {
   useEffect(() => {
     if (!isOpen) return;
     const handleClickOutside = (event) => {
-      const target = event.target;
-      if (ref.current && !ref.current.contains(target)) {
-        const highlightedElement = document.querySelector(HIGHLIGHT_QUERY);
-        if (!highlightedElement || !highlightedElement.contains(target)) {
-          onClose();
-        }
+      const path = event.composedPath();
+      const clickedInsideBubble = ref.current && path.includes(ref.current);
+      if (clickedInsideBubble) {
+        return;
+      }
+      const highlightedElement = document.querySelector(HIGHLIGHT_QUERY);
+      const clickedInsideHighlight = highlightedElement && path.includes(highlightedElement);
+      if (!clickedInsideHighlight) {
+        onClose();
       }
     };
     document.addEventListener("mousedown", handleClickOutside, true);
@@ -361,8 +796,8 @@ function Bubble({
       );
       if (perfectCandidate) {
         bestStyle = {
-          top: `${Math.round(perfectCandidate.top + scrollY)}px`,
-          left: `${Math.round(perfectCandidate.left + scrollX)}px`
+          top: `${Math.round(perfectCandidate.top)}px`,
+          left: `${Math.round(perfectCandidate.left)}px`
         };
       } else if (!pointer) {
         const bestCandidate = (_a2 = orderedCandidates.find((candidate) => candidate.fits)) != null ? _a2 : orderedCandidates.length > 0 ? orderedCandidates.reduce(
@@ -371,8 +806,8 @@ function Bubble({
         ) : null;
         if (bestCandidate) {
           bestStyle = {
-            top: `${Math.round(bestCandidate.top + scrollY)}px`,
-            left: `${Math.round(bestCandidate.left + scrollX)}px`
+            top: `${Math.round(bestCandidate.top)}px`,
+            left: `${Math.round(bestCandidate.left)}px`
           };
         }
       }
@@ -389,8 +824,8 @@ function Bubble({
       }
       const clampedLeft = clampHorizontal(targetLeft);
       bestStyle = {
-        top: `${Math.round(clampedTop + scrollY)}px`,
-        left: `${Math.round(clampedLeft + scrollX)}px`
+        top: `${Math.round(clampedTop)}px`,
+        left: `${Math.round(clampedLeft)}px`
       };
     }
     if (bestStyle) {
@@ -459,10 +894,6 @@ function Bubble({
     "div",
     {
       ref: bubbleRef,
-      className: cn(
-        "absolute z-[2147483647] flex w-full max-w-[400px] flex-col overflow-hidden rounded-xl border border-neutral-200/40 bg-neutral-50/60 text-neutral-900 shadow-2xl backdrop-blur-2xl font-sans dark:border-neutral-700/40 dark:bg-neutral-900/60 dark:text-neutral-50",
-        "animate-in fade-in-0 zoom-in-95 duration-100 ease-out"
-      ),
       style: bubbleStyle,
       role: "dialog",
       "aria-modal": "true",
@@ -473,28 +904,23 @@ function Bubble({
         /* @__PURE__ */ jsxs(
           "div",
           {
-            className: cn(
-              "flex w-full flex-col p-3",
-              showExpandedLayout ? "gap-2" : "gap-0"
-            ),
+            "data-sf-body": "true",
+            "data-expanded": showExpandedLayout ? "true" : "false",
             children: [
-              /* @__PURE__ */ jsxs("div", { className: "relative flex w-full items-center gap-3", children: [
+              /* @__PURE__ */ jsxs("div", { "data-sf-row": "input", children: [
                 /* @__PURE__ */ jsx(
                   "textarea",
                   {
                     ref: textareaRef,
                     "data-react-grab-chat-input": "true",
                     rows: showExpandedLayout ? 2 : 1,
-                    className: cn(
-                      "w-full resize-none bg-transparent text-sm font-normal leading-relaxed text-neutral-800 placeholder:text-neutral-400 outline-none dark:text-neutral-100 dark:placeholder:text-neutral-500",
-                      disableEditing && "opacity-50",
-                      !showExpandedLayout && "pr-10"
-                    ),
                     placeholder: "Change anything",
                     value: chat.instruction,
                     onChange: handleChange,
                     onKeyDown: handleKeyDown,
-                    disabled: disableEditing
+                    disabled: disableEditing,
+                    "data-sf-input": "true",
+                    "data-expanded": showExpandedLayout ? "true" : "false"
                   }
                 ),
                 !showExpandedLayout ? /* @__PURE__ */ jsx(
@@ -503,29 +929,25 @@ function Bubble({
                     type: "button",
                     onClick: onSubmit,
                     disabled: !hasInput || isSubmitting,
-                    className: cn(
-                      "absolute right-0 top-1/2 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-neutral-300/50 text-neutral-600 transition hover:bg-neutral-300/80 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-neutral-700/50 dark:text-neutral-300 dark:hover:bg-neutral-700/80"
-                    ),
-                    children: /* @__PURE__ */ jsx(ArrowUp, { className: "h-4 w-4" })
+                    "data-sf-inline-submit": "true",
+                    children: /* @__PURE__ */ jsx(ArrowUp, {})
                   }
                 ) : null
               ] }),
-              showExpandedLayout ? /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between animate-in fade-in slide-in-from-top-1 duration-150 ease-out", children: [
-                /* @__PURE__ */ jsxs("div", { className: "relative inline-flex", children: [
+              showExpandedLayout ? /* @__PURE__ */ jsxs("div", { "data-sf-toolbar": "true", children: [
+                /* @__PURE__ */ jsxs("div", { "data-sf-select-wrapper": "true", children: [
                   /* @__PURE__ */ jsx(
                     "select",
                     {
                       "aria-label": "Model selection",
-                      className: cn(
-                        "h-8 w-auto appearance-none rounded-lg bg-neutral-200/50 pl-3 pr-[26px] text-xs font-medium text-neutral-500 transition hover:bg-neutral-200/70 focus:outline-none focus:ring-2 focus:ring-neutral-300/50 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-neutral-800/50 dark:text-neutral-400 dark:hover:bg-neutral-800/70 dark:focus:ring-neutral-700/50"
-                      ),
                       value: chat.model,
                       onChange: (event) => onModelChange(event.target.value),
                       disabled: disableEditing,
+                      "data-sf-select": "true",
                       children: modelOptions.map((option) => /* @__PURE__ */ jsx("option", { value: option.value, children: option.label }, option.value))
                     }
                   ),
-                  /* @__PURE__ */ jsx("span", { className: "pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 dark:text-neutral-500", children: /* @__PURE__ */ jsx("svg", { width: "10", height: "6", viewBox: "0 0 10 6", fill: "none", children: /* @__PURE__ */ jsx("path", { d: "M1 1l4 4 4-4", stroke: "currentColor", strokeWidth: "1.5", strokeLinecap: "round", strokeLinejoin: "round" }) }) })
+                  /* @__PURE__ */ jsx("span", { "data-sf-select-chevron": "true", children: /* @__PURE__ */ jsx("svg", { width: "10", height: "6", viewBox: "0 0 10 6", fill: "none", children: /* @__PURE__ */ jsx("path", { d: "M1 1l4 4 4-4", stroke: "currentColor", strokeWidth: "1.5", strokeLinecap: "round", strokeLinejoin: "round" }) }) })
                 ] }),
                 /* @__PURE__ */ jsx(
                   "button",
@@ -533,50 +955,94 @@ function Bubble({
                     type: "button",
                     onClick: isSubmitting ? onStop : onSubmit,
                     disabled: !hasInput && !isSubmitting,
-                    className: cn(
-                      "flex h-8 w-8 items-center justify-center rounded-full transition-all duration-200",
-                      isSubmitting ? "bg-neutral-900 text-white hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200" : "bg-neutral-900 text-white shadow-lg hover:bg-neutral-800 hover:scale-105 dark:bg-white dark:text-black dark:hover:bg-neutral-200",
-                      !hasInput && !isSubmitting && "opacity-0 pointer-events-none"
-                    ),
-                    children: isSubmitting ? /* @__PURE__ */ jsx(Square, { className: "h-3 w-3 fill-current" }) : /* @__PURE__ */ jsx(ArrowUp, { className: "h-4 w-4" })
+                    "data-sf-submit": "true",
+                    "data-hidden": !hasInput && !isSubmitting ? "true" : "false",
+                    "data-submitting": isSubmitting ? "true" : "false",
+                    children: isSubmitting ? /* @__PURE__ */ jsx(Square, {}) : /* @__PURE__ */ jsx(ArrowUp, {})
                   }
                 )
               ] }) : null
             ]
           }
         ),
-        chat.statusAddonMode !== "idle" && /* @__PURE__ */ jsx("div", { className: "flex w-full flex-col border-t border-neutral-200/30 bg-neutral-100/30 px-3 py-2 backdrop-blur-xl dark:border-neutral-800/30 dark:bg-neutral-900/30 animate-in fade-in slide-in-from-top-1 duration-150 ease-out", children: chat.statusAddonMode === "progress" ? /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between gap-3 text-xs font-medium", children: [
-          /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2 shrink-0", children: [
-            /* @__PURE__ */ jsx(CursorIcon, { className: "h-3.5 w-3.5 animate-pulse-subtle" }),
-            /* @__PURE__ */ jsx("span", { className: "bg-gradient-to-r from-neutral-600 via-neutral-600/40 to-neutral-600 bg-[length:200%_100%] bg-clip-text text-transparent animate-shimmer dark:from-neutral-400 dark:via-neutral-400/40 dark:to-neutral-400 opacity-60", children: computedStatusLabel })
-          ] }),
-          chat.statusContext && /* @__PURE__ */ jsx("span", { className: "min-w-0 flex-1 truncate text-right text-neutral-400 dark:text-neutral-500", children: chat.useTypewriter ? /* @__PURE__ */ jsx(Typewriter, { text: chat.statusContext }) : chat.statusContext })
-        ] }) : chat.statusAddonMode === "summary" && chat.summary ? /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between text-xs font-medium", children: [
-          /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2 text-neutral-600 dark:text-neutral-400", children: [
-            /* @__PURE__ */ jsx(CursorIcon, { className: "h-3.5 w-3.5" }),
-            /* @__PURE__ */ jsx("span", { children: "Changes applied" })
-          ] }),
-          /* @__PURE__ */ jsx("div", { className: "flex items-center gap-3", children: /* @__PURE__ */ jsxs(
-            "button",
-            {
-              type: "button",
-              onClick: handleUndo,
-              className: "flex items-center gap-1 text-neutral-400 transition hover:text-neutral-900 dark:text-neutral-500 dark:hover:text-neutral-200",
-              children: [
-                "Undo ",
-                /* @__PURE__ */ jsx(Command, { className: "h-3 w-3 ml-0.5" }),
-                " Z"
-              ]
-            }
-          ) })
-        ] }) : null }),
-        chat.error ? /* @__PURE__ */ jsx("div", { className: "border-t border-red-200/50 bg-red-50/50 px-3 py-2 text-xs font-medium text-red-600 backdrop-blur-xl dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200", children: chat.error }) : null
+        chat.statusAddonMode !== "idle" && /* @__PURE__ */ jsx(
+          "div",
+          {
+            "data-sf-status": "true",
+            "data-mode": chat.statusAddonMode,
+            children: chat.statusAddonMode === "progress" ? /* @__PURE__ */ jsxs("div", { "data-sf-status-header": "true", children: [
+              /* @__PURE__ */ jsxs("div", { "data-sf-status-label": "true", children: [
+                /* @__PURE__ */ jsx(CursorIcon, { loading: true }),
+                /* @__PURE__ */ jsx("span", { "data-sf-shimmer": "true", children: computedStatusLabel })
+              ] }),
+              chat.statusContext && /* @__PURE__ */ jsx("span", { "data-sf-status-context": "true", children: chat.useTypewriter ? /* @__PURE__ */ jsx(Typewriter, { text: chat.statusContext }) : chat.statusContext })
+            ] }) : chat.statusAddonMode === "summary" && chat.summary ? /* @__PURE__ */ jsxs("div", { "data-sf-status-header": "true", children: [
+              /* @__PURE__ */ jsxs("div", { "data-sf-status-label": "true", children: [
+                /* @__PURE__ */ jsx(CursorIcon, {}),
+                /* @__PURE__ */ jsx("span", { children: "Changes applied" })
+              ] }),
+              /* @__PURE__ */ jsx("div", { "data-sf-undo-wrapper": "true", children: /* @__PURE__ */ jsxs(
+                "button",
+                {
+                  type: "button",
+                  onClick: handleUndo,
+                  "data-sf-undo": "true",
+                  children: [
+                    "Undo ",
+                    /* @__PURE__ */ jsx(Command, {}),
+                    " Z"
+                  ]
+                }
+              ) })
+            ] }) : null
+          }
+        ),
+        chat.error ? /* @__PURE__ */ jsx("div", { "data-sf-error": "true", children: chat.error }) : null
       ]
     }
   );
 }
 function FlowOverlayProvider(props = {}) {
   var _a;
+  const [portalTarget, setPortalTarget] = useState(null);
+  const overlayContainerRef = useRef(null);
+  useEffect(() => {
+    const mount = getOrCreateOverlayMount();
+    if (!mount) return;
+    overlayContainerRef.current = mount.container;
+    if (mount.root instanceof ShadowRoot) {
+      ensureOverlayStyles(mount.root);
+    } else if (typeof document !== "undefined") {
+      ensureOverlayStyles(document);
+    }
+    setPortalTarget(mount.root);
+    return () => {
+      if (mount.container.childNodes.length === 0 && mount.container.isConnected) {
+        mount.container.remove();
+      }
+    };
+  }, []);
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const container = overlayContainerRef.current;
+    if (!container) return;
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const updateTheme = () => {
+      const docEl = document.documentElement;
+      const hasDark = docEl.classList.contains("dark");
+      const hasLight = docEl.classList.contains("light");
+      const isDark = hasDark || !hasLight && media.matches;
+      container.dataset.theme = isDark ? "dark" : "light";
+    };
+    updateTheme();
+    const observer = new MutationObserver(updateTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    media.addEventListener("change", updateTheme);
+    return () => {
+      observer.disconnect();
+      media.removeEventListener("change", updateTheme);
+    };
+  }, [portalTarget]);
   const clipboardOptions = useMemo(
     () => {
       var _a2;
@@ -655,7 +1121,7 @@ function FlowOverlayProvider(props = {}) {
   );
   useRecalculateRect(chat, setChat);
   useEscapeToClose(Boolean(chat), close);
-  useAutoFocus(Boolean(chat));
+  useAutoFocus(Boolean(chat), portalTarget);
   const sendToBackend = useCallback(
     async (payload) => {
       var _a2, _b;
@@ -933,28 +1399,31 @@ function FlowOverlayProvider(props = {}) {
     },
     [config.models]
   );
-  const bubble = chat ? /* @__PURE__ */ jsx(
-    Bubble,
-    {
-      chat,
-      onInstructionChange,
-      onSubmit,
-      onStop: stop,
-      onModelChange,
-      onClose: close,
-      modelOptions: config.models,
-      statusSequence: config.statusSequence
-    }
-  ) : null;
-  if (!bubble) return null;
-  return createPortal(bubble, document.body);
+  if (!portalTarget || !chat) {
+    return null;
+  }
+  return createPortal(
+    /* @__PURE__ */ jsx(
+      Bubble,
+      {
+        chat,
+        onInstructionChange,
+        onSubmit,
+        onStop: stop,
+        onModelChange,
+        onClose: close,
+        modelOptions: config.models,
+        statusSequence: config.statusSequence
+      }
+    ),
+    portalTarget
+  );
 }
 export {
   DEFAULT_MODEL_OPTIONS,
   DEFAULT_STATUS_SEQUENCE,
   FlowOverlayProvider,
   Typewriter,
-  createNextHandler,
   loadReactGrabRuntime,
   registerClipboardInterceptor
 };

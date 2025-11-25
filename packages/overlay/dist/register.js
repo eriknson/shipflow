@@ -1,7 +1,7 @@
 import {
   loadReactGrabRuntime,
   registerClipboardInterceptor
-} from "./chunk-RQXM4WWG.js";
+} from "./chunk-JXYVODP6.js";
 export {
   loadReactGrabRuntime,
   registerClipboardInterceptor
