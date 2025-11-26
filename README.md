@@ -1,17 +1,17 @@
 # Shipflow
 
-**Visual editing for React apps, powered by Cursor Agent.**
+**Edit your next.js apps in context, powered by Cursor Agent.**
 
-Shipflow lets you select any component in your running app and edit it with AI — bridging the gap between design and code.
+Shipflow lets you select any component in your running app (Hold ⌘+C) so you can edit it with Cursor Agent in context.
 
 ---
 
-## What is Shipflow?
+## Overview
 
-Shipflow combines [React Grab](https://github.com/nicholasgriffintn/react-grab) with [Cursor Agent](https://docs.cursor.com/agent) to create a seamless visual editing experience:
+Shipflow combines [React Grab]([https://github.com/nicholasgriffintn/react-grab](https://www.react-grab.com/)) with [Cursor Agent](https://docs.cursor.com/agent) to create a seamless visual editing experience:
 
-1. **Select** — Click any element in your app to highlight it
-2. **Describe** — Type what you want to change
+1. **Select** — Click any element in your app (Hold ⌘+C) to highlight it
+2. **Change** — Type what you want to change
 3. **Apply** — Cursor Agent edits the source code directly
 
 No context switching. No copy-pasting file paths. Just point and describe.
