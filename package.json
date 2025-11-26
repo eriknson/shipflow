@@ -57,7 +57,7 @@
   ],
   "sideEffects": false,
   "scripts": {
-    "build": "tsup src/index.ts src/next.ts src/register.ts src/cli.ts --format esm,cjs --dts --sourcemap --clean",
+    "build": "tsup",
     "clean": "rm -rf dist",
     "format": "prettier --write \"src/**/*.{ts,tsx,json,md}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,json,md}\"",
