@@ -1,6 +1,6 @@
 {
   "name": "@shipflow/overlay",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "description": "Shipflow overlay runtime integrating React Grab with a Cursor agent workflow.",
   "license": "MIT",
   "author": {
