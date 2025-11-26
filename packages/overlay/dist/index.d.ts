@@ -28,14 +28,14 @@ declare const DEFAULT_MODEL_OPTIONS: readonly [{
     readonly value: "composer-1";
     readonly label: "Composer 1";
 }, {
-    readonly value: "gpt-5";
-    readonly label: "GPT-5";
+    readonly value: "gemini-3-pro";
+    readonly label: "Gemini 3 Pro";
 }, {
-    readonly value: "sonnet-4.5";
-    readonly label: "Sonnet 4.5";
+    readonly value: "opus-4.5";
+    readonly label: "Opus 4.5";
 }, {
-    readonly value: "gemini-3";
-    readonly label: "Gemini 3";
+    readonly value: "gpt-5.1-codex-high";
+    readonly label: "GPT-5.1 Codex High";
 }];
 
 export { ClipboardInterceptorOptions, DEFAULT_MODEL_OPTIONS, DEFAULT_STATUS_SEQUENCE, type FlowOverlayProps, FlowOverlayProvider, type ModelOption, type ShipflowOverlayConfig, type StatusSequence, Typewriter };

@@ -5,6 +5,9 @@ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __esm = (fn, res) => function __init() {
+  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+};
 var __export = (target, all) => {
   for (var name in all)
     __defProp(target, name, { get: all[name], enumerable: true });
@@ -27,170 +30,13 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 ));
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-// src/next.ts
-var next_exports = {};
-__export(next_exports, {
-  createNextHandler: () => createNextHandler,
-  withShipflowOverlay: () => withShipflowOverlay
-});
-module.exports = __toCommonJS(next_exports);
-
-// src/server/createNextHandler.ts
-var import_path2 = __toESM(require("path"), 1);
-var import_server = require("next/server");
-
 // src/server/cursorAgent.ts
-var import_child_process = require("child_process");
-var import_promises = require("fs/promises");
-var import_fs = require("fs");
-var import_path = __toESM(require("path"), 1);
-var LOG_PREFIX = "[shipflow-overlay]";
-var _a;
-var CURSOR_BINARY_HINT = (_a = process.env.CURSOR_AGENT_BIN) != null ? _a : "cursor-agent";
-var _a2, _b;
-var HOME_DIR = (_b = (_a2 = process.env.HOME) != null ? _a2 : process.env.USERPROFILE) != null ? _b : "";
-var cachedBinary = null;
-var cachedEnv = null;
-var resolvePromise = null;
-var IGNORED_STATUS_MESSAGES = /* @__PURE__ */ new Set(["User event"]);
-var WHITELISTED_STATUS_MESSAGES = /* @__PURE__ */ new Set([
-  "Initializing agent",
-  "Agent ready.",
-  "Thinking",
-  "Building changes",
-  "Analyzing project",
-  "Build step complete."
-]);
-var MIN_STATUS_LENGTH = 30;
-var STATUS_KEYS = ["text", "value", "delta", "message", "summary", "label"];
-var STREAM_HEADERS = {
-  "Content-Type": "application/x-ndjson; charset=utf-8",
-  "Cache-Control": "no-cache, no-transform"
-};
-var pathExistsAndExecutable = async (filePath) => {
-  if (!filePath) return false;
-  try {
-    await (0, import_promises.access)(filePath, import_fs.constants.X_OK);
-    return true;
-  } catch {
-    try {
-      await (0, import_promises.access)(filePath, import_fs.constants.F_OK);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-};
-var describeEvent = (event) => {
-  if (!event || typeof event !== "object") {
-    return null;
-  }
-  const payload = event;
-  const type = typeof payload.type === "string" ? payload.type : null;
-  const subtype = typeof payload.subtype === "string" ? payload.subtype : null;
-  if (type === "system") {
-    if (subtype === "init") {
-      return "Initializing agent";
-    }
-    if (subtype === "progress" && typeof payload.message === "string") {
-      return payload.message;
-    }
-    if (subtype === "completed") {
-      return "Agent ready.";
-    }
-    return subtype ? `System update: ${subtype}` : "System update.";
-  }
-  if (type === "assistant") {
-    return "Thinking\u2026";
-  }
-  if (type === "tool_call") {
-    const toolName = typeof payload.tool === "object" && payload.tool && typeof payload.tool.name === "string" ? String(payload.tool.name) : "Tool";
-    const normalizedName = toolName.toLowerCase();
-    if (subtype === "started") {
-      if (normalizedName.includes("apply") || normalizedName.includes("write") || normalizedName.includes("patch") || normalizedName.includes("build")) {
-        return "Building changes\u2026";
-      }
-      if (normalizedName.includes("plan") || normalizedName.includes("analy")) {
-        return "Analyzing project\u2026";
-      }
-      return `Running ${toolName}\u2026`;
-    }
-    if (subtype === "completed") {
-      if (normalizedName.includes("apply") || normalizedName.includes("write") || normalizedName.includes("patch") || normalizedName.includes("build")) {
-        return "Build step complete.";
-      }
-      return `${toolName} finished.`;
-    }
-    return `${toolName} ${subtype != null ? subtype : "update"}\u2026`;
-  }
-  if (type === "result") {
-    return "Finalizing changes\u2026";
-  }
-  if (type === "error") {
-    if (typeof payload.message === "string") {
-      return `Error: ${payload.message}`;
-    }
-    return "Cursor CLI reported an error.";
-  }
-  if (typeof payload.message === "string") {
-    return payload.message;
-  }
-  return type ? `Event: ${type}${subtype ? `/${subtype}` : ""}` : null;
-};
-var extractAssistantText = (input, seen = /* @__PURE__ */ new WeakSet()) => {
-  if (!input) return "";
-  if (typeof input === "string") {
-    return input;
-  }
-  if (Array.isArray(input)) {
-    return input.map((entry) => extractAssistantText(entry, seen)).join("");
-  }
-  if (typeof input === "object") {
-    if (seen.has(input)) return "";
-    seen.add(input);
-    const record = input;
-    let text = "";
-    for (const key of STATUS_KEYS) {
-      const value = record[key];
-      if (typeof value === "string") {
-        text += value;
-      } else if (value) {
-        text += extractAssistantText(value, seen);
-      }
-    }
-    if ("content" in record) {
-      text += extractAssistantText(record.content, seen);
-    }
-    if ("parts" in record) {
-      text += extractAssistantText(record.parts, seen);
-    }
-    if ("text_delta" in record) {
-      text += extractAssistantText(record.text_delta, seen);
-    }
-    return text;
-  }
-  return "";
-};
-var buildCandidateDirs = (binaryPath, additionalSearchDirs) => {
-  var _a3;
-  const candidateDirs = new Set(
-    ((_a3 = process.env.PATH) != null ? _a3 : "").split(import_path.default.delimiter).map((entry) => entry.trim()).filter(Boolean)
-  );
-  for (const dir of additionalSearchDirs) {
-    if (dir) {
-      candidateDirs.add(dir);
-    }
-  }
-  if (HOME_DIR) {
-    candidateDirs.add(import_path.default.join(HOME_DIR, ".cursor", "bin"));
-    candidateDirs.add(import_path.default.join(HOME_DIR, "Library", "Application Support", "Cursor", "bin"));
-    candidateDirs.add(import_path.default.join(HOME_DIR, "AppData", "Local", "Programs", "cursor", "bin"));
-  }
-  if (binaryPath && import_path.default.isAbsolute(binaryPath)) {
-    candidateDirs.add(import_path.default.dirname(binaryPath));
-  }
-  return Array.from(candidateDirs);
-};
+var cursorAgent_exports = {};
+__export(cursorAgent_exports, {
+  STREAM_HEADERS: () => STREAM_HEADERS2,
+  resolveCursorAgentBinary: () => resolveCursorAgentBinary,
+  runCursorAgentStream: () => runCursorAgentStream
+});
 async function discoverCursorAgentBinary(options) {
   var _a3, _b2;
   const additionalSearchDirs = (_a3 = options.additionalSearchDirs) != null ? _a3 : [];
@@ -452,9 +298,204 @@ async function runCursorAgentStream(options, send) {
     }
   });
 }
+var import_child_process, import_promises, import_fs, import_path, LOG_PREFIX, _a, CURSOR_BINARY_HINT, _a2, _b, HOME_DIR, cachedBinary, cachedEnv, resolvePromise, IGNORED_STATUS_MESSAGES, WHITELISTED_STATUS_MESSAGES, MIN_STATUS_LENGTH, STATUS_KEYS, STREAM_HEADERS2, pathExistsAndExecutable, describeEvent, extractAssistantText, buildCandidateDirs;
+var init_cursorAgent = __esm({
+  "src/server/cursorAgent.ts"() {
+    "use strict";
+    import_child_process = require("child_process");
+    import_promises = require("fs/promises");
+    import_fs = require("fs");
+    import_path = __toESM(require("path"), 1);
+    LOG_PREFIX = "[shipflow-overlay]";
+    CURSOR_BINARY_HINT = (_a = process.env.CURSOR_AGENT_BIN) != null ? _a : "cursor-agent";
+    HOME_DIR = (_b = (_a2 = process.env.HOME) != null ? _a2 : process.env.USERPROFILE) != null ? _b : "";
+    cachedBinary = null;
+    cachedEnv = null;
+    resolvePromise = null;
+    IGNORED_STATUS_MESSAGES = /* @__PURE__ */ new Set(["User event"]);
+    WHITELISTED_STATUS_MESSAGES = /* @__PURE__ */ new Set([
+      "Initializing agent",
+      "Agent ready.",
+      "Thinking",
+      "Building changes",
+      "Analyzing project",
+      "Build step complete."
+    ]);
+    MIN_STATUS_LENGTH = 30;
+    STATUS_KEYS = ["text", "value", "delta", "message", "summary", "label"];
+    STREAM_HEADERS2 = {
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform"
+    };
+    pathExistsAndExecutable = async (filePath) => {
+      if (!filePath) return false;
+      try {
+        await (0, import_promises.access)(filePath, import_fs.constants.X_OK);
+        return true;
+      } catch {
+        try {
+          await (0, import_promises.access)(filePath, import_fs.constants.F_OK);
+          return true;
+        } catch {
+          return false;
+        }
+      }
+    };
+    describeEvent = (event) => {
+      if (!event || typeof event !== "object") {
+        return null;
+      }
+      const payload = event;
+      const type = typeof payload.type === "string" ? payload.type : null;
+      const subtype = typeof payload.subtype === "string" ? payload.subtype : null;
+      if (type === "system") {
+        if (subtype === "init") {
+          return "Initializing agent";
+        }
+        if (subtype === "progress" && typeof payload.message === "string") {
+          return payload.message;
+        }
+        if (subtype === "completed") {
+          return "Agent ready.";
+        }
+        return subtype ? `System update: ${subtype}` : "System update.";
+      }
+      if (type === "assistant") {
+        return "Thinking\u2026";
+      }
+      if (type === "tool_call") {
+        const toolName = typeof payload.tool === "object" && payload.tool && typeof payload.tool.name === "string" ? String(payload.tool.name) : "Tool";
+        const normalizedName = toolName.toLowerCase();
+        if (subtype === "started") {
+          if (normalizedName.includes("apply") || normalizedName.includes("write") || normalizedName.includes("patch") || normalizedName.includes("build")) {
+            return "Building changes\u2026";
+          }
+          if (normalizedName.includes("plan") || normalizedName.includes("analy")) {
+            return "Analyzing project\u2026";
+          }
+          return `Running ${toolName}\u2026`;
+        }
+        if (subtype === "completed") {
+          if (normalizedName.includes("apply") || normalizedName.includes("write") || normalizedName.includes("patch") || normalizedName.includes("build")) {
+            return "Build step complete.";
+          }
+          return `${toolName} finished.`;
+        }
+        return `${toolName} ${subtype != null ? subtype : "update"}\u2026`;
+      }
+      if (type === "result") {
+        return "Finalizing changes\u2026";
+      }
+      if (type === "error") {
+        if (typeof payload.message === "string") {
+          return `Error: ${payload.message}`;
+        }
+        return "Cursor CLI reported an error.";
+      }
+      if (typeof payload.message === "string") {
+        return payload.message;
+      }
+      return type ? `Event: ${type}${subtype ? `/${subtype}` : ""}` : null;
+    };
+    extractAssistantText = (input, seen = /* @__PURE__ */ new WeakSet()) => {
+      if (!input) return "";
+      if (typeof input === "string") {
+        return input;
+      }
+      if (Array.isArray(input)) {
+        return input.map((entry) => extractAssistantText(entry, seen)).join("");
+      }
+      if (typeof input === "object") {
+        if (seen.has(input)) return "";
+        seen.add(input);
+        const record = input;
+        let text = "";
+        for (const key of STATUS_KEYS) {
+          const value = record[key];
+          if (typeof value === "string") {
+            text += value;
+          } else if (value) {
+            text += extractAssistantText(value, seen);
+          }
+        }
+        if ("content" in record) {
+          text += extractAssistantText(record.content, seen);
+        }
+        if ("parts" in record) {
+          text += extractAssistantText(record.parts, seen);
+        }
+        if ("text_delta" in record) {
+          text += extractAssistantText(record.text_delta, seen);
+        }
+        return text;
+      }
+      return "";
+    };
+    buildCandidateDirs = (binaryPath, additionalSearchDirs) => {
+      var _a3;
+      const candidateDirs = new Set(
+        ((_a3 = process.env.PATH) != null ? _a3 : "").split(import_path.default.delimiter).map((entry) => entry.trim()).filter(Boolean)
+      );
+      for (const dir of additionalSearchDirs) {
+        if (dir) {
+          candidateDirs.add(dir);
+        }
+      }
+      if (HOME_DIR) {
+        candidateDirs.add(import_path.default.join(HOME_DIR, ".cursor", "bin"));
+        candidateDirs.add(import_path.default.join(HOME_DIR, "Library", "Application Support", "Cursor", "bin"));
+        candidateDirs.add(import_path.default.join(HOME_DIR, "AppData", "Local", "Programs", "cursor", "bin"));
+      }
+      if (binaryPath && import_path.default.isAbsolute(binaryPath)) {
+        candidateDirs.add(import_path.default.dirname(binaryPath));
+      }
+      return Array.from(candidateDirs);
+    };
+  }
+});
+
+// src/next.ts
+var next_exports = {};
+__export(next_exports, {
+  createNextHandler: () => createNextHandler,
+  withShipflowOverlay: () => withShipflowOverlay
+});
+module.exports = __toCommonJS(next_exports);
+
+// src/server/createNextHandler.ts
+var import_server = require("next/server");
+
+// src/runtime/constants.ts
+var STREAM_HEADERS = {
+  "Content-Type": "application/x-ndjson; charset=utf-8",
+  "Cache-Control": "no-cache, no-transform"
+};
 
 // src/server/createNextHandler.ts
 var DEFAULT_MODEL = "composer-1";
+var isAbsolutePath = (p) => {
+  if (p.startsWith("/")) return true;
+  if (/^[A-Za-z]:[\\/]/.test(p)) return true;
+  return false;
+};
+var normalizeSeparators = (p) => p.replace(/\\/g, "/");
+var getRelativePath = (from, to) => {
+  const fromParts = normalizeSeparators(from).split("/").filter(Boolean);
+  const toParts = normalizeSeparators(to).split("/").filter(Boolean);
+  let commonLength = 0;
+  const minLength = Math.min(fromParts.length, toParts.length);
+  for (let i = 0; i < minLength; i++) {
+    if (fromParts[i] === toParts[i]) {
+      commonLength++;
+    } else {
+      break;
+    }
+  }
+  const upCount = fromParts.length - commonLength;
+  const downParts = toParts.slice(commonLength);
+  const relativeParts = [...Array(upCount).fill(".."), ...downParts];
+  return relativeParts.join("/") || ".";
+};
 var STACK_TRACE_PATTERNS = [
   // Format: "in Component (path/to/file.tsx:10:5)" or "at Component (path/to/file.tsx:10:5)"
   /\b(?:in|at)\s+\S+\s*\(([^()]+?\.(?:[jt]sx?|mdx?))(?::\d+)*\)/gi,
@@ -493,14 +534,14 @@ var normalizeFilePath = (filePath) => {
 };
 var pathIsAbsoluteSafe = (target) => {
   try {
-    return import_path2.default.isAbsolute(target);
+    return isAbsolutePath(target);
   } catch {
     return false;
   }
 };
 var relativeSafe = (from, to) => {
   try {
-    return import_path2.default.relative(from, to);
+    return getRelativePath(from, to);
   } catch {
     return to;
   }
@@ -540,14 +581,32 @@ var extractFilePathFromStackTrace = (stackTrace) => {
   }
   return null;
 };
+var extractComponentNames = (stackTrace) => {
+  if (!stackTrace) return [];
+  const matches = stackTrace.matchAll(/\b(?:at|in)\s+([A-Z][a-zA-Z0-9]*)\s*\(Server\)/g);
+  return [...matches].map((m) => m[1]).filter(Boolean);
+};
 var buildPrompt = (filePath, htmlFrame, stackTrace, instruction) => {
   const lines = [];
-  lines.push(`Open ${filePath}.`);
-  lines.push("Target the element matching this HTML:");
-  lines.push(htmlFrame != null ? htmlFrame : "(no HTML frame provided)");
-  lines.push("");
-  lines.push("and the component stack:");
-  lines.push(stackTrace != null ? stackTrace : "(no component stack provided)");
+  if (filePath) {
+    lines.push(`Open ${filePath}.`);
+    lines.push("Target the element matching this HTML:");
+    lines.push(htmlFrame != null ? htmlFrame : "(no HTML frame provided)");
+    lines.push("");
+    lines.push("and the component stack:");
+    lines.push(stackTrace != null ? stackTrace : "(no component stack provided)");
+  } else {
+    lines.push("Find the file containing the component that renders this HTML:");
+    lines.push(htmlFrame != null ? htmlFrame : "(no HTML frame provided)");
+    lines.push("");
+    lines.push("Component stack (use component names to locate the file):");
+    lines.push(stackTrace != null ? stackTrace : "(no component stack provided)");
+    const componentNames = extractComponentNames(stackTrace);
+    if (componentNames.length > 0) {
+      lines.push("");
+      lines.push(`Look for files defining these components: ${componentNames.join(", ")}`);
+    }
+  }
   lines.push("");
   lines.push(`User request: ${instruction}`);
   return lines.join("\n");
@@ -569,7 +628,7 @@ function createNextHandler(options = {}) {
   var _a3;
   const logPrefix = (_a3 = options.logPrefix) != null ? _a3 : "[shipflow-overlay]";
   return async function handler(request) {
-    var _a4, _b2, _c, _d, _e;
+    var _a4, _b2, _c, _d;
     if (!isEnabled(options)) {
       return import_server.NextResponse.json(
         { error: "Shipflow overlay workflow is only available in development." },
@@ -592,19 +651,14 @@ function createNextHandler(options = {}) {
     if (!normalizedFilePath) {
       const truncatedStack = (_c = (_b2 = payload.stackTrace) == null ? void 0 : _b2.slice(0, 200)) != null ? _c : "(none)";
       console.warn(
-        `${logPrefix} Could not extract file path. filePath: ${(_d = payload.filePath) != null ? _d : "(null)"}, stackTrace snippet: ${truncatedStack}`
-      );
-      return import_server.NextResponse.json(
-        {
-          error: "Unable to determine target file path. Make sure you're selecting an element from your project (not from node_modules)."
-        },
-        { status: 400 }
+        `${logPrefix} No file path found, using fallback prompt. stackTrace snippet: ${truncatedStack}`
       );
     }
     const prompt = buildPrompt(normalizedFilePath, payload.htmlFrame, payload.stackTrace, instruction);
-    const model = ((_e = payload.model) == null ? void 0 : _e.trim()) || options.defaultModel || DEFAULT_MODEL;
+    const model = ((_d = payload.model) == null ? void 0 : _d.trim()) || options.defaultModel || DEFAULT_MODEL;
     try {
-      const resolved = await resolveCursorAgentBinary(
+      const { resolveCursorAgentBinary: resolveCursorAgentBinary2, runCursorAgentStream: runCursorAgentStream2 } = await Promise.resolve().then(() => (init_cursorAgent(), cursorAgent_exports));
+      const resolved = await resolveCursorAgentBinary2(
         stripNullish({
           binaryPath: options.cursorAgentBinary,
           additionalSearchDirs: options.additionalSearchDirs,
@@ -637,7 +691,7 @@ function createNextHandler(options = {}) {
           });
           send({ event: "status", message: "Understanding user intent" });
           try {
-            await runCursorAgentStream(
+            await runCursorAgentStream2(
               {
                 binary: resolved.binary,
                 model,

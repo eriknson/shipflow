@@ -42,9 +42,9 @@ var DEFAULT_STATUS_SEQUENCE = [
 ];
 var DEFAULT_MODEL_OPTIONS = [
   { value: "composer-1", label: "Composer 1" },
-  { value: "gpt-5", label: "GPT-5" },
-  { value: "sonnet-4.5", label: "Sonnet 4.5" },
-  { value: "gemini-3", label: "Gemini 3" }
+  { value: "gemini-3-pro", label: "Gemini 3 Pro" },
+  { value: "opus-4.5", label: "Opus 4.5" },
+  { value: "gpt-5.1-codex-high", label: "GPT-5.1 Codex High" }
 ];
 
 // src/runtime/loadReactGrabRuntime.ts
@@ -372,7 +372,7 @@ var ensureOverlayStyles = (root) => {
   --sf-inline-hover-bg: rgba(212, 212, 212, 0.85);
   --sf-inline-text: #4b5563;
   --sf-inline-disabled-opacity: 0.5;
-  --sf-select-bg: transparent;
+  --sf-select-bg: rgba(0, 0, 0, 0.035);
   --sf-select-hover-bg: rgba(212, 212, 212, 0.25);
   --sf-select-text: #4b5563;
   --sf-focus-ring: rgba(212, 212, 212, 0.5);
@@ -398,7 +398,7 @@ var ensureOverlayStyles = (root) => {
     --sf-inline-bg: rgba(64, 64, 64, 0.5);
     --sf-inline-hover-bg: rgba(64, 64, 64, 0.8);
     --sf-inline-text: #e5e5e5;
-    --sf-select-bg: transparent;
+    --sf-select-bg: rgba(255, 255, 255, 0.045);
     --sf-select-hover-bg: rgba(64, 64, 64, 0.3);
     --sf-select-text: #a3a3a3;
     --sf-focus-ring: rgba(64, 64, 64, 0.5);
