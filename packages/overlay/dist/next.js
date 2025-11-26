@@ -4,6 +4,271 @@ import {
 
 // src/server/createNextHandler.ts
 import { NextResponse } from "next/server";
+
+// src/server/undoManager.ts
+import { readFile, writeFile, unlink, readdir, stat } from "fs/promises";
+import { join, relative, extname } from "path";
+import { randomUUID } from "crypto";
+var LOG_PREFIX = "[shipflow-undo]";
+var SOURCE_EXTENSIONS = /* @__PURE__ */ new Set([
+  ".ts",
+  ".tsx",
+  ".js",
+  ".jsx",
+  ".mjs",
+  ".cjs",
+  ".json",
+  ".css",
+  ".scss",
+  ".sass",
+  ".less",
+  ".md",
+  ".mdx",
+  ".html"
+]);
+var IGNORE_DIRS = /* @__PURE__ */ new Set([
+  "node_modules",
+  ".next",
+  ".git",
+  "dist",
+  "build",
+  ".turbo",
+  ".vercel",
+  "coverage",
+  ".nyc_output",
+  "__pycache__",
+  ".cache"
+]);
+var IGNORE_PATTERNS = [/\.min\./, /\.d\.ts$/, /\.map$/];
+var MAX_FILE_SIZE = 1 * 1024 * 1024;
+var MAX_SESSION_SIZE = 50 * 1024 * 1024;
+var MAX_SESSIONS = 5;
+var UndoManager = class {
+  constructor() {
+    this.sessions = /* @__PURE__ */ new Map();
+    this.sessionOrder = [];
+    // For FIFO eviction
+    this.latestSessionId = null;
+  }
+  /**
+   * Create a new undo session
+   */
+  createSession(instruction, filePath) {
+    const id = randomUUID();
+    const session = {
+      id,
+      timestamp: Date.now(),
+      instruction,
+      filePath,
+      snapshots: /* @__PURE__ */ new Map(),
+      totalSize: 0
+    };
+    this.sessions.set(id, session);
+    this.sessionOrder.push(id);
+    this.latestSessionId = id;
+    while (this.sessionOrder.length > MAX_SESSIONS) {
+      const oldestId = this.sessionOrder.shift();
+      if (oldestId) {
+        this.sessions.delete(oldestId);
+        console.log(`${LOG_PREFIX} Evicted old session: ${oldestId}`);
+      }
+    }
+    console.log(`${LOG_PREFIX} Created session: ${id}`);
+    return id;
+  }
+  /**
+   * Capture the current state of all source files in the workspace
+   */
+  async captureWorkspace(sessionId, cwd) {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      throw new Error(`Session not found: ${sessionId}`);
+    }
+    console.log(`${LOG_PREFIX} Capturing workspace: ${cwd}`);
+    const startTime = Date.now();
+    let fileCount = 0;
+    try {
+      await this.walkDirectory(cwd, cwd, session);
+      fileCount = session.snapshots.size;
+    } catch (error) {
+      console.error(`${LOG_PREFIX} Error capturing workspace:`, error);
+      throw error;
+    }
+    const duration = Date.now() - startTime;
+    console.log(
+      `${LOG_PREFIX} Captured ${fileCount} files (${(session.totalSize / 1024).toFixed(1)}KB) in ${duration}ms`
+    );
+  }
+  /**
+   * Recursively walk directory and capture files
+   */
+  async walkDirectory(dir, rootDir, session) {
+    let entries;
+    try {
+      entries = await readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const fullPath = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (IGNORE_DIRS.has(entry.name)) {
+          continue;
+        }
+        await this.walkDirectory(fullPath, rootDir, session);
+      } else if (entry.isFile()) {
+        await this.captureFile(fullPath, rootDir, session);
+      }
+    }
+  }
+  /**
+   * Capture a single file if it matches our criteria
+   */
+  async captureFile(filePath, rootDir, session) {
+    const ext = extname(filePath).toLowerCase();
+    if (!SOURCE_EXTENSIONS.has(ext)) {
+      return;
+    }
+    const relativePath = relative(rootDir, filePath);
+    if (IGNORE_PATTERNS.some((pattern) => pattern.test(relativePath))) {
+      return;
+    }
+    let stats;
+    try {
+      stats = await stat(filePath);
+    } catch {
+      return;
+    }
+    if (stats.size > MAX_FILE_SIZE) {
+      console.log(`${LOG_PREFIX} Skipping large file: ${relativePath} (${(stats.size / 1024 / 1024).toFixed(1)}MB)`);
+      return;
+    }
+    if (session.totalSize + stats.size > MAX_SESSION_SIZE) {
+      console.warn(`${LOG_PREFIX} Session size limit reached, stopping capture`);
+      return;
+    }
+    try {
+      const content = await readFile(filePath, "utf-8");
+      session.snapshots.set(filePath, content);
+      session.totalSize += stats.size;
+    } catch (error) {
+      console.warn(`${LOG_PREFIX} Failed to read file: ${relativePath}`, error);
+    }
+  }
+  /**
+   * Restore workspace to the state captured in the session
+   */
+  async restoreSession(sessionId) {
+    var _a;
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      return {
+        success: false,
+        restored: [],
+        deleted: [],
+        error: `Session not found: ${sessionId}`
+      };
+    }
+    console.log(`${LOG_PREFIX} Restoring session: ${sessionId}`);
+    const restored = [];
+    const deleted = [];
+    const errors = [];
+    for (const [filePath, originalContent] of session.snapshots) {
+      try {
+        if (originalContent === null) {
+          try {
+            await unlink(filePath);
+            deleted.push(filePath);
+            console.log(`${LOG_PREFIX} Deleted: ${filePath}`);
+          } catch {
+          }
+        } else {
+          let currentContent = null;
+          try {
+            currentContent = await readFile(filePath, "utf-8");
+          } catch {
+          }
+          if (currentContent !== originalContent) {
+            await writeFile(filePath, originalContent, "utf-8");
+            restored.push(filePath);
+            console.log(`${LOG_PREFIX} Restored: ${filePath}`);
+          }
+        }
+      } catch (error) {
+        const msg = `Failed to restore ${filePath}: ${error instanceof Error ? error.message : String(error)}`;
+        errors.push(msg);
+        console.error(`${LOG_PREFIX} ${msg}`);
+      }
+    }
+    this.sessions.delete(sessionId);
+    const idx = this.sessionOrder.indexOf(sessionId);
+    if (idx !== -1) {
+      this.sessionOrder.splice(idx, 1);
+    }
+    if (this.latestSessionId === sessionId) {
+      this.latestSessionId = (_a = this.sessionOrder[this.sessionOrder.length - 1]) != null ? _a : null;
+    }
+    console.log(
+      `${LOG_PREFIX} Restore complete: ${restored.length} restored, ${deleted.length} deleted`
+    );
+    return {
+      success: errors.length === 0,
+      restored,
+      deleted,
+      error: errors.length > 0 ? errors.join("; ") : void 0
+    };
+  }
+  /**
+   * Get the latest session ID
+   */
+  getLatestSessionId() {
+    return this.latestSessionId;
+  }
+  /**
+   * Get session info (without full snapshots)
+   */
+  getSessionInfo(sessionId) {
+    const session = this.sessions.get(sessionId);
+    if (!session) return null;
+    return {
+      id: session.id,
+      timestamp: session.timestamp,
+      instruction: session.instruction,
+      filePath: session.filePath,
+      totalSize: session.totalSize
+    };
+  }
+  /**
+   * List all sessions
+   */
+  listSessions() {
+    return this.sessionOrder.map((id) => {
+      const session = this.sessions.get(id);
+      return {
+        id: session.id,
+        timestamp: session.timestamp,
+        instruction: session.instruction,
+        filePath: session.filePath,
+        totalSize: session.totalSize
+      };
+    });
+  }
+  /**
+   * Track a new file that was created during agent execution
+   * Call this when we detect a file was created that wasn't in our initial snapshot
+   */
+  trackNewFile(sessionId, filePath) {
+    const session = this.sessions.get(sessionId);
+    if (!session) return;
+    if (!session.snapshots.has(filePath)) {
+      session.snapshots.set(filePath, null);
+      console.log(`${LOG_PREFIX} Tracking new file: ${filePath}`);
+    }
+  }
+};
+var undoManager = new UndoManager();
+
+// src/server/createNextHandler.ts
 var DEFAULT_MODEL = "composer-1";
 var isAbsolutePath = (p) => {
   if (p.startsWith("/")) return true;
@@ -59,8 +324,8 @@ var normalizeFilePath = (filePath) => {
   }
   const cwd = process.cwd();
   if (pathIsAbsoluteSafe(sanitized)) {
-    const relative = relativeSafe(cwd, sanitized);
-    return relative.startsWith("..") ? sanitized : relative;
+    const relative2 = relativeSafe(cwd, sanitized);
+    return relative2.startsWith("..") ? sanitized : relative2;
   }
   return sanitized;
 };
@@ -197,6 +462,13 @@ function createNextHandler(options = {}) {
           logPrefix
         })
       );
+      const cwd = process.cwd();
+      const sessionId = undoManager.createSession(instruction, normalizedFilePath);
+      try {
+        await undoManager.captureWorkspace(sessionId, cwd);
+      } catch (error) {
+        console.warn(`${logPrefix} Failed to capture workspace for undo:`, error);
+      }
       const encoder = new TextEncoder();
       const stream = new ReadableStream({
         async start(controller) {
@@ -221,6 +493,7 @@ function createNextHandler(options = {}) {
             } catch {
             }
           });
+          send({ event: "session", sessionId });
           send({ event: "status", message: "Understanding user intent" });
           try {
             await runCursorAgentStream(
@@ -272,6 +545,75 @@ function createNextHandler(options = {}) {
   };
 }
 
+// src/server/createUndoHandler.ts
+import { NextResponse as NextResponse2 } from "next/server";
+var isEnabled2 = (options) => {
+  if (options.allowInProduction) {
+    return true;
+  }
+  const envFlag = process.env.SHIPFLOW_OVERLAY_ENABLED;
+  if (envFlag && ["true", "1", "on", "yes"].includes(envFlag.toLowerCase())) {
+    return true;
+  }
+  return process.env.NODE_ENV === "development";
+};
+function createUndoHandler(options = {}) {
+  var _a;
+  const logPrefix = (_a = options.logPrefix) != null ? _a : "[shipflow-undo]";
+  return async function handler(request) {
+    var _a2, _b;
+    if (!isEnabled2(options)) {
+      return NextResponse2.json(
+        { error: "Shipflow undo is only available in development." },
+        { status: 403 }
+      );
+    }
+    let payload;
+    try {
+      payload = await request.json();
+    } catch {
+      payload = {};
+    }
+    const sessionId = (_a2 = payload.sessionId) != null ? _a2 : undoManager.getLatestSessionId();
+    if (!sessionId) {
+      return NextResponse2.json(
+        { error: "No undo session available." },
+        { status: 404 }
+      );
+    }
+    console.log(`${logPrefix} Undo requested for session: ${sessionId}`);
+    try {
+      const result = await undoManager.restoreSession(sessionId);
+      if (!result.success) {
+        return NextResponse2.json(
+          {
+            success: false,
+            error: (_b = result.error) != null ? _b : "Failed to restore session.",
+            restored: result.restored,
+            deleted: result.deleted
+          },
+          { status: 500 }
+        );
+      }
+      return NextResponse2.json({
+        success: true,
+        restored: result.restored,
+        deleted: result.deleted,
+        message: `Restored ${result.restored.length} file(s), deleted ${result.deleted.length} file(s).`
+      });
+    } catch (error) {
+      console.error(`${logPrefix} Undo failed:`, error);
+      return NextResponse2.json(
+        {
+          success: false,
+          error: error instanceof Error ? error.message : "Unexpected error during undo."
+        },
+        { status: 500 }
+      );
+    }
+  };
+}
+
 // src/next.ts
 function withShipflowOverlay(config = {}, options = {}) {
   const enabled = options.enableInProduction || process.env.NODE_ENV === "development";
@@ -297,6 +639,7 @@ function withShipflowOverlay(config = {}, options = {}) {
 }
 export {
   createNextHandler,
+  createUndoHandler,
   withShipflowOverlay
 };
 //# sourceMappingURL=next.js.map

@@ -23,13 +23,12 @@ import type {
   StatusSequence,
   StreamEvent,
 } from "./types";
-import { loadReactGrabRuntime } from "./loadReactGrabRuntime";
-import {
-  registerClipboardInterceptor,
-  type ClipboardInterceptorOptions,
-} from "./registerClipboardInterceptor";
+import { initReactGrab, disposeReactGrab, type InitReactGrabOptions } from "./initReactGrab";
 
-const HIGHLIGHT_QUERY = "[data-react-grab-chat-highlighted='true']";
+const HIGHLIGHT_ATTR = "data-react-grab-chat-highlighted";
+const HIGHLIGHT_QUERY = `[${HIGHLIGHT_ATTR}='true']`;
+const LOADING_ATTR = "data-react-grab-loading";
+const SHIMMER_ATTR = "data-sf-shimmer-overlay";
 const OVERLAY_STYLE_ID = "shipflow-overlay-styles";
 const OVERLAY_ROOT_ID = "shipflow-overlay-root";
 
@@ -506,6 +505,7 @@ type ChatState = SelectionPayload & {
   statusContext: string | null;
   useTypewriter: boolean;
   summary?: string;
+  sessionId?: string;
 };
 
 const DEFAULT_BUBBLE_STYLE: CSSProperties = {
@@ -544,7 +544,7 @@ const createInitialState = (
 
 export type FlowOverlayProps = Partial<ShipflowOverlayConfig> & {
   enableClipboardInterceptor?: boolean;
-  clipboardOptions?: ClipboardInterceptorOptions;
+  clipboardOptions?: InitReactGrabOptions;
 };
 
 function CursorIcon({ loading }: { loading?: boolean }) {
@@ -745,6 +745,7 @@ function Bubble({
   onStop,
   onModelChange,
   onClose,
+  onUndo,
   modelOptions,
   statusSequence,
 }: {
@@ -754,6 +755,7 @@ function Bubble({
   onStop: () => void;
   onModelChange: (value: string) => void;
   onClose: () => void;
+  onUndo: () => void;
   modelOptions: readonly ModelOption[];
   statusSequence: StatusSequence;
 }) {
@@ -1007,16 +1009,21 @@ function Bubble({
       return;
     }
 
+    // Call the undo handler
+    onUndo();
+
+    // Also dispatch event for backward compatibility
     window.dispatchEvent(
       new CustomEvent(EVENT_UNDO, {
         detail: {
           instruction: chat.instruction,
           summary: chat.summary ?? null,
           filePath: chat.filePath,
+          sessionId: chat.sessionId,
         },
       }),
     );
-  }, [chat]);
+  }, [chat, onUndo]);
 
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -1263,36 +1270,26 @@ export function FlowOverlayProvider(props: FlowOverlayProps = {}) {
       return;
     }
 
-    let cleanup: (() => void) | undefined;
+    let mounted = true;
 
-    loadReactGrabRuntime({
-      url: clipboardOptions.reactGrabUrl,
-    })
-      .then(() => {
-        cleanup = registerClipboardInterceptor({
-          projectRoot: clipboardOptions.projectRoot,
-          highlightColor: clipboardOptions.highlightColor,
-          highlightStyleId: clipboardOptions.highlightStyleId,
-          logClipboardEndpoint:
-            clipboardOptions.logClipboardEndpoint ??
-            process.env.SHIPFLOW_OVERLAY_LOG_ENDPOINT ??
-            null,
-          reactGrabUrl: clipboardOptions.reactGrabUrl,
-        });
-      })
-      .catch((error) => {
-        console.error("[shipflow-overlay] Failed to load React Grab runtime", error);
-      });
+    initReactGrab({
+      projectRoot: clipboardOptions.projectRoot,
+      highlightColor: clipboardOptions.highlightColor,
+      highlightStyleId: clipboardOptions.highlightStyleId,
+    }).catch((error) => {
+      if (mounted) {
+        console.error("[shipflow-overlay] Failed to initialize React Grab:", error);
+      }
+    });
 
     return () => {
-      cleanup?.();
+      mounted = false;
+      disposeReactGrab();
     };
   }, [
     clipboardOptions.highlightColor,
     clipboardOptions.highlightStyleId,
-    clipboardOptions.logClipboardEndpoint,
     clipboardOptions.projectRoot,
-    clipboardOptions.reactGrabUrl,
     props.enableClipboardInterceptor,
   ]);
 
@@ -1381,6 +1378,19 @@ export function FlowOverlayProvider(props: FlowOverlayProps = {}) {
         let hasPromotedUpdating = false;
 
         const processEvent = (event: StreamEvent) => {
+          // Handle session event to store sessionId for undo
+          if (event.event === "session") {
+            setChat((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    sessionId: event.sessionId,
+                  }
+                : prev,
+            );
+            return;
+          }
+
           if (event.event === "status") {
             const message = event.message?.trim();
             if (message) {
@@ -1654,6 +1664,135 @@ export function FlowOverlayProvider(props: FlowOverlayProps = {}) {
     [config.models],
   );
 
+  // Shimmer overlay ref
+  const shimmerRef = useRef<{
+    overlay: HTMLElement | null;
+    element: HTMLElement | null;
+    scrollHandler: (() => void) | null;
+    resizeHandler: (() => void) | null;
+  }>({ overlay: null, element: null, scrollHandler: null, resizeHandler: null });
+
+  // Toggle loading shimmer overlay on highlighted element
+  useEffect(() => {
+    const highlighted = document.querySelector<HTMLElement>(HIGHLIGHT_QUERY);
+    const isLoading = chat?.status === "submitting";
+    const shimmer = shimmerRef.current;
+
+    if (isLoading && highlighted && highlighted.isConnected) {
+      highlighted.setAttribute(LOADING_ATTR, "true");
+
+      // Create shimmer overlay if it doesn't exist
+      if (!shimmer.overlay) {
+        const overlay = document.createElement("div");
+        overlay.setAttribute(SHIMMER_ATTR, "true");
+        document.body.appendChild(overlay);
+        shimmer.overlay = overlay;
+        shimmer.element = highlighted;
+
+        const updatePosition = () => {
+          if (!highlighted.isConnected || !shimmer.overlay) return;
+          const rect = highlighted.getBoundingClientRect();
+          shimmer.overlay.style.top = `${rect.top}px`;
+          shimmer.overlay.style.left = `${rect.left}px`;
+          shimmer.overlay.style.width = `${rect.width}px`;
+          shimmer.overlay.style.height = `${rect.height}px`;
+        };
+
+        updatePosition();
+
+        shimmer.scrollHandler = () => updatePosition();
+        shimmer.resizeHandler = () => updatePosition();
+        window.addEventListener("scroll", shimmer.scrollHandler, true);
+        window.addEventListener("resize", shimmer.resizeHandler);
+      }
+    } else {
+      // Remove shimmer overlay
+      if (shimmer.overlay) {
+        if (shimmer.scrollHandler) {
+          window.removeEventListener("scroll", shimmer.scrollHandler, true);
+        }
+        if (shimmer.resizeHandler) {
+          window.removeEventListener("resize", shimmer.resizeHandler);
+        }
+        shimmer.overlay.remove();
+        shimmer.overlay = null;
+        shimmer.scrollHandler = null;
+        shimmer.resizeHandler = null;
+      }
+      if (shimmer.element) {
+        shimmer.element.removeAttribute(LOADING_ATTR);
+        shimmer.element = null;
+      }
+      if (highlighted) {
+        highlighted.removeAttribute(LOADING_ATTR);
+      }
+    }
+
+    // Cleanup on unmount
+    return () => {
+      if (shimmer.overlay) {
+        if (shimmer.scrollHandler) {
+          window.removeEventListener("scroll", shimmer.scrollHandler, true);
+        }
+        if (shimmer.resizeHandler) {
+          window.removeEventListener("resize", shimmer.resizeHandler);
+        }
+        shimmer.overlay.remove();
+        shimmer.overlay = null;
+        shimmer.scrollHandler = null;
+        shimmer.resizeHandler = null;
+      }
+      if (shimmer.element) {
+        shimmer.element.removeAttribute(LOADING_ATTR);
+        shimmer.element = null;
+      }
+    };
+  }, [chat?.status]);
+
+  // Undo handler
+  const onUndo = useCallback(async () => {
+    const sessionId = chat?.sessionId;
+    if (!sessionId) {
+      console.warn("[shipflow-overlay] No session ID available for undo");
+      return;
+    }
+
+    try {
+      // Derive undo endpoint from the main endpoint
+      const undoEndpoint = config.endpoint.replace(/\/overlay\/?$/, "/undo");
+
+      const response = await fetch(undoEndpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ sessionId }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        console.error("[shipflow-overlay] Undo failed:", data.error);
+        return;
+      }
+
+      // Success - reset chat state
+      setChat((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: "idle",
+              statusAddonMode: "idle",
+              summary: undefined,
+              sessionId: undefined,
+            }
+          : prev,
+      );
+    } catch (error) {
+      console.error("[shipflow-overlay] Undo failed:", error);
+    }
+  }, [chat?.sessionId, config.endpoint]);
+
   if (!portalTarget || !chat) {
     return null;
   }
@@ -1666,6 +1805,7 @@ export function FlowOverlayProvider(props: FlowOverlayProps = {}) {
       onStop={stop}
       onModelChange={onModelChange}
       onClose={close}
+      onUndo={onUndo}
       modelOptions={config.models}
       statusSequence={config.statusSequence}
     />,

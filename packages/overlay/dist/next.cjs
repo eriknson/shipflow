@@ -40,7 +40,7 @@ __export(cursorAgent_exports, {
 async function discoverCursorAgentBinary(options) {
   var _a3, _b2;
   const additionalSearchDirs = (_a3 = options.additionalSearchDirs) != null ? _a3 : [];
-  const logPrefix = (_b2 = options.logPrefix) != null ? _b2 : LOG_PREFIX;
+  const logPrefix = (_b2 = options.logPrefix) != null ? _b2 : LOG_PREFIX2;
   const candidateNames = /* @__PURE__ */ new Set();
   if (options.binaryPath) {
     candidateNames.add(options.binaryPath);
@@ -54,7 +54,7 @@ async function discoverCursorAgentBinary(options) {
   }
   for (const name of candidateNames) {
     if (!name) continue;
-    if (import_path.default.isAbsolute(name)) {
+    if (import_path2.default.isAbsolute(name)) {
       if (await pathExistsAndExecutable(name)) {
         return {
           binary: name,
@@ -75,7 +75,7 @@ async function discoverCursorAgentBinary(options) {
       }
     }
     for (const dir of buildCandidateDirs(name, additionalSearchDirs)) {
-      const fullPath = import_path.default.join(dir, name);
+      const fullPath = import_path2.default.join(dir, name);
       if (await pathExistsAndExecutable(fullPath)) {
         return {
           binary: fullPath,
@@ -113,16 +113,16 @@ async function resolveCursorAgentBinary(options = {}) {
       cachedBinary = resolved.binary;
       const extraDirs = [
         ...(_a3 = options.additionalSearchDirs) != null ? _a3 : [],
-        import_path.default.dirname(resolved.binary)
+        import_path2.default.dirname(resolved.binary)
       ];
       if (HOME_DIR) {
-        extraDirs.push(import_path.default.join(HOME_DIR, ".cursor", "bin"));
-        extraDirs.push(import_path.default.join(HOME_DIR, "Library", "Application Support", "Cursor", "bin"));
-        extraDirs.push(import_path.default.join(HOME_DIR, "AppData", "Local", "Programs", "cursor", "bin"));
+        extraDirs.push(import_path2.default.join(HOME_DIR, ".cursor", "bin"));
+        extraDirs.push(import_path2.default.join(HOME_DIR, "Library", "Application Support", "Cursor", "bin"));
+        extraDirs.push(import_path2.default.join(HOME_DIR, "AppData", "Local", "Programs", "cursor", "bin"));
       }
       const existingPath = (_b2 = process.env.PATH) != null ? _b2 : "";
       const pathSegments = new Set(
-        existingPath.split(import_path.default.delimiter).map((segment) => segment.trim()).filter(Boolean)
+        existingPath.split(import_path2.default.delimiter).map((segment) => segment.trim()).filter(Boolean)
       );
       for (const dir of extraDirs) {
         if (dir) {
@@ -131,7 +131,7 @@ async function resolveCursorAgentBinary(options = {}) {
       }
       cachedEnv = {
         ...process.env,
-        PATH: Array.from(pathSegments).join(import_path.default.delimiter)
+        PATH: Array.from(pathSegments).join(import_path2.default.delimiter)
       };
       return {
         binary: resolved.binary,
@@ -146,7 +146,7 @@ async function resolveCursorAgentBinary(options = {}) {
 }
 async function runCursorAgentStream(options, send) {
   var _a3;
-  const logPrefix = (_a3 = options.logPrefix) != null ? _a3 : LOG_PREFIX;
+  const logPrefix = (_a3 = options.logPrefix) != null ? _a3 : LOG_PREFIX2;
   await new Promise((resolve) => {
     var _a4, _b2;
     try {
@@ -320,15 +320,15 @@ async function runCursorAgentStream(options, send) {
     }
   });
 }
-var import_child_process, import_promises, import_fs, import_path, LOG_PREFIX, _a, CURSOR_BINARY_HINT, _a2, _b, HOME_DIR, cachedBinary, cachedEnv, resolvePromise, IGNORED_STATUS_MESSAGES, WHITELISTED_STATUS_MESSAGES, MIN_STATUS_LENGTH, STATUS_KEYS, STREAM_HEADERS2, pathExistsAndExecutable, describeEvent, extractAssistantText, buildCandidateDirs;
+var import_child_process, import_promises2, import_fs, import_path2, LOG_PREFIX2, _a, CURSOR_BINARY_HINT, _a2, _b, HOME_DIR, cachedBinary, cachedEnv, resolvePromise, IGNORED_STATUS_MESSAGES, WHITELISTED_STATUS_MESSAGES, MIN_STATUS_LENGTH, STATUS_KEYS, STREAM_HEADERS2, pathExistsAndExecutable, describeEvent, extractAssistantText, buildCandidateDirs;
 var init_cursorAgent = __esm({
   "src/server/cursorAgent.ts"() {
     "use strict";
     import_child_process = require("child_process");
-    import_promises = require("fs/promises");
+    import_promises2 = require("fs/promises");
     import_fs = require("fs");
-    import_path = __toESM(require("path"), 1);
-    LOG_PREFIX = "[shipflow-overlay]";
+    import_path2 = __toESM(require("path"), 1);
+    LOG_PREFIX2 = "[shipflow-overlay]";
     CURSOR_BINARY_HINT = (_a = process.env.CURSOR_AGENT_BIN) != null ? _a : "cursor-agent";
     HOME_DIR = (_b = (_a2 = process.env.HOME) != null ? _a2 : process.env.USERPROFILE) != null ? _b : "";
     cachedBinary = null;
@@ -352,11 +352,11 @@ var init_cursorAgent = __esm({
     pathExistsAndExecutable = async (filePath) => {
       if (!filePath) return false;
       try {
-        await (0, import_promises.access)(filePath, import_fs.constants.X_OK);
+        await (0, import_promises2.access)(filePath, import_fs.constants.X_OK);
         return true;
       } catch {
         try {
-          await (0, import_promises.access)(filePath, import_fs.constants.F_OK);
+          await (0, import_promises2.access)(filePath, import_fs.constants.F_OK);
           return true;
         } catch {
           return false;
@@ -456,7 +456,7 @@ var init_cursorAgent = __esm({
     buildCandidateDirs = (binaryPath, additionalSearchDirs) => {
       var _a3;
       const candidateDirs = new Set(
-        ((_a3 = process.env.PATH) != null ? _a3 : "").split(import_path.default.delimiter).map((entry) => entry.trim()).filter(Boolean)
+        ((_a3 = process.env.PATH) != null ? _a3 : "").split(import_path2.default.delimiter).map((entry) => entry.trim()).filter(Boolean)
       );
       for (const dir of additionalSearchDirs) {
         if (dir) {
@@ -464,12 +464,12 @@ var init_cursorAgent = __esm({
         }
       }
       if (HOME_DIR) {
-        candidateDirs.add(import_path.default.join(HOME_DIR, ".cursor", "bin"));
-        candidateDirs.add(import_path.default.join(HOME_DIR, "Library", "Application Support", "Cursor", "bin"));
-        candidateDirs.add(import_path.default.join(HOME_DIR, "AppData", "Local", "Programs", "cursor", "bin"));
+        candidateDirs.add(import_path2.default.join(HOME_DIR, ".cursor", "bin"));
+        candidateDirs.add(import_path2.default.join(HOME_DIR, "Library", "Application Support", "Cursor", "bin"));
+        candidateDirs.add(import_path2.default.join(HOME_DIR, "AppData", "Local", "Programs", "cursor", "bin"));
       }
-      if (binaryPath && import_path.default.isAbsolute(binaryPath)) {
-        candidateDirs.add(import_path.default.dirname(binaryPath));
+      if (binaryPath && import_path2.default.isAbsolute(binaryPath)) {
+        candidateDirs.add(import_path2.default.dirname(binaryPath));
       }
       return Array.from(candidateDirs);
     };
@@ -480,6 +480,7 @@ var init_cursorAgent = __esm({
 var next_exports = {};
 __export(next_exports, {
   createNextHandler: () => createNextHandler,
+  createUndoHandler: () => createUndoHandler,
   withShipflowOverlay: () => withShipflowOverlay
 });
 module.exports = __toCommonJS(next_exports);
@@ -492,6 +493,269 @@ var STREAM_HEADERS = {
   "Content-Type": "application/x-ndjson; charset=utf-8",
   "Cache-Control": "no-cache, no-transform"
 };
+
+// src/server/undoManager.ts
+var import_promises = require("fs/promises");
+var import_path = require("path");
+var import_crypto = require("crypto");
+var LOG_PREFIX = "[shipflow-undo]";
+var SOURCE_EXTENSIONS = /* @__PURE__ */ new Set([
+  ".ts",
+  ".tsx",
+  ".js",
+  ".jsx",
+  ".mjs",
+  ".cjs",
+  ".json",
+  ".css",
+  ".scss",
+  ".sass",
+  ".less",
+  ".md",
+  ".mdx",
+  ".html"
+]);
+var IGNORE_DIRS = /* @__PURE__ */ new Set([
+  "node_modules",
+  ".next",
+  ".git",
+  "dist",
+  "build",
+  ".turbo",
+  ".vercel",
+  "coverage",
+  ".nyc_output",
+  "__pycache__",
+  ".cache"
+]);
+var IGNORE_PATTERNS = [/\.min\./, /\.d\.ts$/, /\.map$/];
+var MAX_FILE_SIZE = 1 * 1024 * 1024;
+var MAX_SESSION_SIZE = 50 * 1024 * 1024;
+var MAX_SESSIONS = 5;
+var UndoManager = class {
+  constructor() {
+    this.sessions = /* @__PURE__ */ new Map();
+    this.sessionOrder = [];
+    // For FIFO eviction
+    this.latestSessionId = null;
+  }
+  /**
+   * Create a new undo session
+   */
+  createSession(instruction, filePath) {
+    const id = (0, import_crypto.randomUUID)();
+    const session = {
+      id,
+      timestamp: Date.now(),
+      instruction,
+      filePath,
+      snapshots: /* @__PURE__ */ new Map(),
+      totalSize: 0
+    };
+    this.sessions.set(id, session);
+    this.sessionOrder.push(id);
+    this.latestSessionId = id;
+    while (this.sessionOrder.length > MAX_SESSIONS) {
+      const oldestId = this.sessionOrder.shift();
+      if (oldestId) {
+        this.sessions.delete(oldestId);
+        console.log(`${LOG_PREFIX} Evicted old session: ${oldestId}`);
+      }
+    }
+    console.log(`${LOG_PREFIX} Created session: ${id}`);
+    return id;
+  }
+  /**
+   * Capture the current state of all source files in the workspace
+   */
+  async captureWorkspace(sessionId, cwd) {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      throw new Error(`Session not found: ${sessionId}`);
+    }
+    console.log(`${LOG_PREFIX} Capturing workspace: ${cwd}`);
+    const startTime = Date.now();
+    let fileCount = 0;
+    try {
+      await this.walkDirectory(cwd, cwd, session);
+      fileCount = session.snapshots.size;
+    } catch (error) {
+      console.error(`${LOG_PREFIX} Error capturing workspace:`, error);
+      throw error;
+    }
+    const duration = Date.now() - startTime;
+    console.log(
+      `${LOG_PREFIX} Captured ${fileCount} files (${(session.totalSize / 1024).toFixed(1)}KB) in ${duration}ms`
+    );
+  }
+  /**
+   * Recursively walk directory and capture files
+   */
+  async walkDirectory(dir, rootDir, session) {
+    let entries;
+    try {
+      entries = await (0, import_promises.readdir)(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const fullPath = (0, import_path.join)(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (IGNORE_DIRS.has(entry.name)) {
+          continue;
+        }
+        await this.walkDirectory(fullPath, rootDir, session);
+      } else if (entry.isFile()) {
+        await this.captureFile(fullPath, rootDir, session);
+      }
+    }
+  }
+  /**
+   * Capture a single file if it matches our criteria
+   */
+  async captureFile(filePath, rootDir, session) {
+    const ext = (0, import_path.extname)(filePath).toLowerCase();
+    if (!SOURCE_EXTENSIONS.has(ext)) {
+      return;
+    }
+    const relativePath = (0, import_path.relative)(rootDir, filePath);
+    if (IGNORE_PATTERNS.some((pattern) => pattern.test(relativePath))) {
+      return;
+    }
+    let stats;
+    try {
+      stats = await (0, import_promises.stat)(filePath);
+    } catch {
+      return;
+    }
+    if (stats.size > MAX_FILE_SIZE) {
+      console.log(`${LOG_PREFIX} Skipping large file: ${relativePath} (${(stats.size / 1024 / 1024).toFixed(1)}MB)`);
+      return;
+    }
+    if (session.totalSize + stats.size > MAX_SESSION_SIZE) {
+      console.warn(`${LOG_PREFIX} Session size limit reached, stopping capture`);
+      return;
+    }
+    try {
+      const content = await (0, import_promises.readFile)(filePath, "utf-8");
+      session.snapshots.set(filePath, content);
+      session.totalSize += stats.size;
+    } catch (error) {
+      console.warn(`${LOG_PREFIX} Failed to read file: ${relativePath}`, error);
+    }
+  }
+  /**
+   * Restore workspace to the state captured in the session
+   */
+  async restoreSession(sessionId) {
+    var _a3;
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      return {
+        success: false,
+        restored: [],
+        deleted: [],
+        error: `Session not found: ${sessionId}`
+      };
+    }
+    console.log(`${LOG_PREFIX} Restoring session: ${sessionId}`);
+    const restored = [];
+    const deleted = [];
+    const errors = [];
+    for (const [filePath, originalContent] of session.snapshots) {
+      try {
+        if (originalContent === null) {
+          try {
+            await (0, import_promises.unlink)(filePath);
+            deleted.push(filePath);
+            console.log(`${LOG_PREFIX} Deleted: ${filePath}`);
+          } catch {
+          }
+        } else {
+          let currentContent = null;
+          try {
+            currentContent = await (0, import_promises.readFile)(filePath, "utf-8");
+          } catch {
+          }
+          if (currentContent !== originalContent) {
+            await (0, import_promises.writeFile)(filePath, originalContent, "utf-8");
+            restored.push(filePath);
+            console.log(`${LOG_PREFIX} Restored: ${filePath}`);
+          }
+        }
+      } catch (error) {
+        const msg = `Failed to restore ${filePath}: ${error instanceof Error ? error.message : String(error)}`;
+        errors.push(msg);
+        console.error(`${LOG_PREFIX} ${msg}`);
+      }
+    }
+    this.sessions.delete(sessionId);
+    const idx = this.sessionOrder.indexOf(sessionId);
+    if (idx !== -1) {
+      this.sessionOrder.splice(idx, 1);
+    }
+    if (this.latestSessionId === sessionId) {
+      this.latestSessionId = (_a3 = this.sessionOrder[this.sessionOrder.length - 1]) != null ? _a3 : null;
+    }
+    console.log(
+      `${LOG_PREFIX} Restore complete: ${restored.length} restored, ${deleted.length} deleted`
+    );
+    return {
+      success: errors.length === 0,
+      restored,
+      deleted,
+      error: errors.length > 0 ? errors.join("; ") : void 0
+    };
+  }
+  /**
+   * Get the latest session ID
+   */
+  getLatestSessionId() {
+    return this.latestSessionId;
+  }
+  /**
+   * Get session info (without full snapshots)
+   */
+  getSessionInfo(sessionId) {
+    const session = this.sessions.get(sessionId);
+    if (!session) return null;
+    return {
+      id: session.id,
+      timestamp: session.timestamp,
+      instruction: session.instruction,
+      filePath: session.filePath,
+      totalSize: session.totalSize
+    };
+  }
+  /**
+   * List all sessions
+   */
+  listSessions() {
+    return this.sessionOrder.map((id) => {
+      const session = this.sessions.get(id);
+      return {
+        id: session.id,
+        timestamp: session.timestamp,
+        instruction: session.instruction,
+        filePath: session.filePath,
+        totalSize: session.totalSize
+      };
+    });
+  }
+  /**
+   * Track a new file that was created during agent execution
+   * Call this when we detect a file was created that wasn't in our initial snapshot
+   */
+  trackNewFile(sessionId, filePath) {
+    const session = this.sessions.get(sessionId);
+    if (!session) return;
+    if (!session.snapshots.has(filePath)) {
+      session.snapshots.set(filePath, null);
+      console.log(`${LOG_PREFIX} Tracking new file: ${filePath}`);
+    }
+  }
+};
+var undoManager = new UndoManager();
 
 // src/server/createNextHandler.ts
 var DEFAULT_MODEL = "composer-1";
@@ -549,8 +813,8 @@ var normalizeFilePath = (filePath) => {
   }
   const cwd = process.cwd();
   if (pathIsAbsoluteSafe(sanitized)) {
-    const relative = relativeSafe(cwd, sanitized);
-    return relative.startsWith("..") ? sanitized : relative;
+    const relative2 = relativeSafe(cwd, sanitized);
+    return relative2.startsWith("..") ? sanitized : relative2;
   }
   return sanitized;
 };
@@ -687,6 +951,13 @@ function createNextHandler(options = {}) {
           logPrefix
         })
       );
+      const cwd = process.cwd();
+      const sessionId = undoManager.createSession(instruction, normalizedFilePath);
+      try {
+        await undoManager.captureWorkspace(sessionId, cwd);
+      } catch (error) {
+        console.warn(`${logPrefix} Failed to capture workspace for undo:`, error);
+      }
       const encoder = new TextEncoder();
       const stream = new ReadableStream({
         async start(controller) {
@@ -711,6 +982,7 @@ function createNextHandler(options = {}) {
             } catch {
             }
           });
+          send({ event: "session", sessionId });
           send({ event: "status", message: "Understanding user intent" });
           try {
             await runCursorAgentStream2(
@@ -762,6 +1034,75 @@ function createNextHandler(options = {}) {
   };
 }
 
+// src/server/createUndoHandler.ts
+var import_server2 = require("next/server");
+var isEnabled2 = (options) => {
+  if (options.allowInProduction) {
+    return true;
+  }
+  const envFlag = process.env.SHIPFLOW_OVERLAY_ENABLED;
+  if (envFlag && ["true", "1", "on", "yes"].includes(envFlag.toLowerCase())) {
+    return true;
+  }
+  return process.env.NODE_ENV === "development";
+};
+function createUndoHandler(options = {}) {
+  var _a3;
+  const logPrefix = (_a3 = options.logPrefix) != null ? _a3 : "[shipflow-undo]";
+  return async function handler(request) {
+    var _a4, _b2;
+    if (!isEnabled2(options)) {
+      return import_server2.NextResponse.json(
+        { error: "Shipflow undo is only available in development." },
+        { status: 403 }
+      );
+    }
+    let payload;
+    try {
+      payload = await request.json();
+    } catch {
+      payload = {};
+    }
+    const sessionId = (_a4 = payload.sessionId) != null ? _a4 : undoManager.getLatestSessionId();
+    if (!sessionId) {
+      return import_server2.NextResponse.json(
+        { error: "No undo session available." },
+        { status: 404 }
+      );
+    }
+    console.log(`${logPrefix} Undo requested for session: ${sessionId}`);
+    try {
+      const result = await undoManager.restoreSession(sessionId);
+      if (!result.success) {
+        return import_server2.NextResponse.json(
+          {
+            success: false,
+            error: (_b2 = result.error) != null ? _b2 : "Failed to restore session.",
+            restored: result.restored,
+            deleted: result.deleted
+          },
+          { status: 500 }
+        );
+      }
+      return import_server2.NextResponse.json({
+        success: true,
+        restored: result.restored,
+        deleted: result.deleted,
+        message: `Restored ${result.restored.length} file(s), deleted ${result.deleted.length} file(s).`
+      });
+    } catch (error) {
+      console.error(`${logPrefix} Undo failed:`, error);
+      return import_server2.NextResponse.json(
+        {
+          success: false,
+          error: error instanceof Error ? error.message : "Unexpected error during undo."
+        },
+        { status: 500 }
+      );
+    }
+  };
+}
+
 // src/next.ts
 function withShipflowOverlay(config = {}, options = {}) {
   const enabled = options.enableInProduction || process.env.NODE_ENV === "development";
@@ -788,6 +1129,7 @@ function withShipflowOverlay(config = {}, options = {}) {
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   createNextHandler,
+  createUndoHandler,
   withShipflowOverlay
 });
 //# sourceMappingURL=next.cjs.map

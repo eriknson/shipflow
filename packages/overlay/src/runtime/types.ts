@@ -22,6 +22,7 @@ export type SelectionPayload = {
 export type StatusAddonMode = "idle" | "progress" | "summary";
 
 export type StreamEvent =
+  | { event: "session"; sessionId: string }
   | { event: "status"; message: string }
   | { event: "assistant"; text: string }
   | {

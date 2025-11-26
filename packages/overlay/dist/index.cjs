@@ -24,8 +24,8 @@ __export(index_exports, {
   DEFAULT_STATUS_SEQUENCE: () => DEFAULT_STATUS_SEQUENCE,
   FlowOverlayProvider: () => FlowOverlayProvider,
   Typewriter: () => Typewriter,
-  loadReactGrabRuntime: () => loadReactGrabRuntime,
-  registerClipboardInterceptor: () => registerClipboardInterceptor
+  disposeReactGrab: () => disposeReactGrab,
+  initReactGrab: () => initReactGrab
 });
 module.exports = __toCommonJS(index_exports);
 
@@ -47,54 +47,17 @@ var DEFAULT_MODEL_OPTIONS = [
   { value: "gpt-5.1-codex-high", label: "GPT-5.1 Codex High" }
 ];
 
-// src/runtime/loadReactGrabRuntime.ts
-var DEFAULT_SCRIPT_URL = "https://unpkg.com/react-grab@0.0.51/dist/index.global.js";
-var GLOBAL_FLAG = "__shipflowReactGrabLoaded";
-var pendingLoad = null;
-function loadReactGrabRuntime(options = {}) {
-  var _a;
-  if (typeof window === "undefined") {
-    return Promise.resolve();
-  }
-  if (window[GLOBAL_FLAG]) {
-    return Promise.resolve();
-  }
-  if (pendingLoad) {
-    return pendingLoad;
-  }
-  const scriptUrl = (_a = options.url) != null ? _a : DEFAULT_SCRIPT_URL;
-  pendingLoad = new Promise((resolve, reject) => {
-    const existing = Array.from(document.scripts).find((script2) => script2.src === scriptUrl);
-    if (existing) {
-      window[GLOBAL_FLAG] = true;
-      pendingLoad = null;
-      resolve();
-      return;
-    }
-    const script = document.createElement("script");
-    script.src = scriptUrl;
-    script.crossOrigin = "anonymous";
-    script.async = false;
-    script.onload = () => {
-      window[GLOBAL_FLAG] = true;
-      pendingLoad = null;
-      resolve();
-    };
-    script.onerror = (error) => {
-      pendingLoad = null;
-      reject(error instanceof ErrorEvent ? error.error : error);
-    };
-    document.head.appendChild(script);
-  });
-  return pendingLoad;
-}
-
-// src/runtime/registerClipboardInterceptor.ts
-var GLOBAL_KEY = "__shipflowOverlayCleanup";
+// src/runtime/initReactGrab.ts
+var INIT_FLAG = "__shipflowReactGrabInitialized";
 var HIGHLIGHT_ATTR = "data-react-grab-chat-highlighted";
+var SELECTION_ID_ATTR = "data-sf-selection-id";
 var STYLE_ID = "shipflow-overlay-highlight-style";
 var EVENT_OPEN = "react-grab-chat:open";
 var EVENT_CLOSE = "react-grab-chat:close";
+var selectionIdCounter = 0;
+var generateSelectionId = () => `sel-${++selectionIdCounter}-${Date.now()}`;
+var apiInstance = null;
+var originalWriteText = null;
 var defaultOptions = {
   highlightColor: "#ff40e0",
   highlightStyleId: STYLE_ID
@@ -108,6 +71,54 @@ function ensureHighlightStyles(color, styleId) {
   outline: 2px solid ${color};
   outline-offset: 2px;
   transition: outline 0.2s ease;
+}
+
+/* Loading state: hide default outline, shimmer overlay will be added separately */
+[${HIGHLIGHT_ATTR}="true"][data-react-grab-loading="true"] {
+  outline: none;
+}
+
+/* Shimmer overlay element - positioned over the selected element */
+[data-sf-shimmer-overlay="true"] {
+  position: fixed;
+  pointer-events: none;
+  z-index: 2147483645;
+  overflow: hidden;
+  border-radius: 4px;
+}
+
+[data-sf-shimmer-overlay="true"]::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(0, 0, 0, 0.04) 25%,
+    rgba(0, 0, 0, 0.08) 50%,
+    rgba(0, 0, 0, 0.04) 75%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: sf-shimmer 2s linear infinite;
+}
+
+[data-sf-shimmer-overlay="true"]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.02);
+  animation: sf-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes sf-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes sf-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
 }`;
   document.head.appendChild(style);
 }
@@ -126,13 +137,9 @@ function extractFilePath(stack) {
   var _a;
   if (typeof stack !== "string") return null;
   const patterns = [
-    // Format: "in Component (path/to/file.tsx:10:5)" or "at Component (path/to/file.tsx:10:5)"
     /\b(?:in|at)\s+\S+\s*\(([^()]+?\.(?:[jt]sx?|mdx?))(?::\d+)*\)/gi,
-    // Format: "in path/to/file.tsx" or "at path/to/file.tsx"
     /\b(?:in|at)\s+((?:[A-Za-z]:)?[^\s:()]+?\.(?:[jt]sx?|mdx?))/gi,
-    // Format: just "(path/to/file.tsx:10:5)" in parentheses
     /\(([^()]+?\.(?:[jt]sx?|mdx?))(?::\d+)*\)/gi,
-    // Format: bare path like "app/page.tsx" or "./app/page.tsx"
     /(?:^|\s)((?:\.\/)?(?:[A-Za-z]:)?[^\s:()]+?\.(?:[jt]sx?|mdx?))/gim
   ];
   for (const pattern of patterns) {
@@ -158,19 +165,19 @@ function toRelativePath(filePath, projectRoot) {
   }
   return filePath;
 }
-function findElementAtPoint(clientX, clientY) {
-  var _a;
-  const elements = document.elementsFromPoint(clientX, clientY);
-  for (const element of elements) {
-    if (!(element instanceof HTMLElement)) continue;
-    if ((_a = element.closest) == null ? void 0 : _a.call(element, "[data-react-grab]")) continue;
-    const style = window.getComputedStyle(element);
-    if (style.pointerEvents === "none" || style.visibility === "hidden" || style.display === "none" || Number(style.opacity) === 0) {
-      continue;
-    }
-    return element;
-  }
-  return null;
+function applyHighlight(element, selectionId) {
+  if (!element) return;
+  element.setAttribute(HIGHLIGHT_ATTR, "true");
+  element.setAttribute(SELECTION_ID_ATTR, selectionId);
+}
+function clearHighlight() {
+  const highlighted = document.querySelectorAll(`[${HIGHLIGHT_ATTR}="true"]`);
+  highlighted.forEach((el) => {
+    el.removeAttribute(HIGHLIGHT_ATTR);
+    el.removeAttribute(SELECTION_ID_ATTR);
+    el.removeAttribute("data-sf-chat-id");
+    el.removeAttribute("data-react-grab-loading");
+  });
 }
 function findTooltipElement() {
   var _a;
@@ -178,21 +185,15 @@ function findTooltipElement() {
   const TOOLTIP_SELECTOR = "div.pointer-events-none.bg-grab-pink-light.text-grab-pink";
   const visited = /* @__PURE__ */ new Set();
   const visit = (node) => {
-    if (!node || visited.has(node)) {
-      return null;
-    }
+    if (!node || visited.has(node)) return null;
     visited.add(node);
     if (node instanceof HTMLElement || node instanceof DocumentFragment) {
       const queryMatch = node instanceof HTMLElement ? node.querySelector(TOOLTIP_SELECTOR) : null;
-      if (queryMatch) {
-        return queryMatch;
-      }
+      if (queryMatch) return queryMatch;
       const children = node instanceof HTMLElement ? Array.from(node.children) : [];
       for (const child of children) {
         const found = visit(child);
-        if (found) {
-          return found;
-        }
+        if (found) return found;
       }
     }
     if (node instanceof HTMLElement && node.shadowRoot) {
@@ -203,21 +204,15 @@ function findTooltipElement() {
   const hosts = document.querySelectorAll(OVERLAY_SELECTOR);
   for (const host of hosts) {
     const found = (_a = visit(host)) != null ? _a : host.shadowRoot ? visit(host.shadowRoot) : null;
-    if (found) {
-      return found;
-    }
+    if (found) return found;
   }
   return null;
 }
 function getHoverTagRect() {
   const tooltip = findTooltipElement();
-  if (!(tooltip instanceof HTMLElement)) {
-    return null;
-  }
+  if (!(tooltip instanceof HTMLElement)) return null;
   const rect = tooltip.getBoundingClientRect();
-  if (rect.width === 0 && rect.height === 0) {
-    return null;
-  }
+  if (rect.width === 0 && rect.height === 0) return null;
   return {
     top: rect.top,
     left: rect.left,
@@ -225,129 +220,108 @@ function getHoverTagRect() {
     height: rect.height
   };
 }
-function applyHighlight(element) {
-  if (!element) return;
-  const previous = document.querySelector(`[${HIGHLIGHT_ATTR}="true"]`);
-  if (previous && previous !== element) {
-    previous.removeAttribute(HIGHLIGHT_ATTR);
-  }
-  element.setAttribute(HIGHLIGHT_ATTR, "true");
-}
-function clearHighlight() {
-  const highlighted = document.querySelector(`[${HIGHLIGHT_ATTR}="true"]`);
-  highlighted == null ? void 0 : highlighted.removeAttribute(HIGHLIGHT_ATTR);
-}
 function dispatchOpenEvent(detail) {
-  window.dispatchEvent(
-    new CustomEvent(EVENT_OPEN, {
-      detail
-    })
-  );
+  window.dispatchEvent(new CustomEvent(EVENT_OPEN, { detail }));
 }
-function registerClipboardInterceptor(options = {}) {
-  var _a, _b;
-  if (typeof window === "undefined" || typeof navigator === "undefined") {
-    return () => void 0;
+function handleSelection(elements, content, options) {
+  const parsed = parseClipboard(content);
+  const selectionId = generateSelectionId();
+  const element = elements[0] instanceof HTMLElement ? elements[0] : null;
+  let boundingRect = null;
+  if (element) {
+    applyHighlight(element, selectionId);
+    const rect = element.getBoundingClientRect();
+    boundingRect = {
+      top: rect.top,
+      left: rect.left,
+      width: rect.width,
+      height: rect.height
+    };
   }
-  if (window[GLOBAL_KEY]) {
-    return window[GLOBAL_KEY];
+  let filePath = parsed.codeLocation ? extractFilePath(parsed.codeLocation) : null;
+  filePath = filePath ? toRelativePath(filePath, options.projectRoot) : null;
+  const tagRect = getHoverTagRect();
+  dispatchOpenEvent({
+    htmlFrame: parsed.htmlFrame,
+    codeLocation: parsed.codeLocation,
+    filePath,
+    clipboardData: content,
+    pointer: null,
+    // Not needed with direct element reference
+    boundingRect,
+    tagRect,
+    selectionId,
+    targetElement: element
+  });
+}
+async function initReactGrab(options = {}) {
+  var _a, _b;
+  if (typeof window === "undefined") {
+    return null;
+  }
+  if (window[INIT_FLAG]) {
+    return apiInstance;
   }
   if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {
     console.warn("[shipflow-overlay] navigator.clipboard.writeText is not available.");
-    return () => void 0;
+    return null;
   }
-  const projectRoot = options.projectRoot;
   const highlightColor = (_a = options.highlightColor) != null ? _a : defaultOptions.highlightColor;
   const highlightStyleId = (_b = options.highlightStyleId) != null ? _b : defaultOptions.highlightStyleId;
-  const logClipboardEndpoint = options.logClipboardEndpoint === void 0 ? null : options.logClipboardEndpoint;
   ensureHighlightStyles(highlightColor, highlightStyleId);
   clearHighlight();
-  void loadReactGrabRuntime({ url: options.reactGrabUrl });
-  let lastPointer = null;
-  const pointerListener = (event) => {
-    const pointer = event;
-    lastPointer = { clientX: pointer.clientX, clientY: pointer.clientY };
-  };
-  window.addEventListener("pointerup", pointerListener, true);
   window.addEventListener(EVENT_CLOSE, clearHighlight);
-  const originalWriteText = navigator.clipboard.writeText.bind(navigator.clipboard);
-  const overrideWriteText = async function(text) {
-    const parsed = parseClipboard(text);
-    const isReactGrabPayload = Boolean(parsed.htmlFrame || parsed.codeLocation);
-    const result = await originalWriteText(text);
-    if (!isReactGrabPayload) {
-      return result;
-    }
-    const pointer = lastPointer;
-    lastPointer = null;
-    const pointerPayload = pointer ? { x: pointer.clientX, y: pointer.clientY } : null;
-    let boundingRect = null;
-    let element = null;
-    if (pointer) {
-      element = findElementAtPoint(pointer.clientX, pointer.clientY);
-    }
-    if (!element) {
-      const fallback = document.querySelector(`[${HIGHLIGHT_ATTR}="true"]`);
-      if (fallback) {
-        element = fallback;
-      }
-    }
-    if (element instanceof HTMLElement) {
-      applyHighlight(element);
-      const rect = element.getBoundingClientRect();
-      boundingRect = {
-        top: rect.top,
-        left: rect.left,
-        width: rect.width,
-        height: rect.height
-      };
-    }
-    let filePath = parsed.codeLocation ? extractFilePath(parsed.codeLocation) : null;
-    filePath = filePath ? toRelativePath(filePath, projectRoot) : null;
-    const tagRect = getHoverTagRect();
-    dispatchOpenEvent({
-      htmlFrame: parsed.htmlFrame,
-      codeLocation: parsed.codeLocation,
-      filePath,
-      clipboardData: text,
-      pointer: pointerPayload,
-      boundingRect,
-      tagRect
-    });
-    if (logClipboardEndpoint) {
-      try {
-        await fetch(logClipboardEndpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            clipboardData: text,
-            timestamp: (/* @__PURE__ */ new Date()).toISOString(),
-            filePath
-          })
-        });
-      } catch (error) {
-        console.error("[shipflow-overlay] Failed to log clipboard payload", error);
-      }
-    }
-    return result;
+  originalWriteText = navigator.clipboard.writeText.bind(navigator.clipboard);
+  navigator.clipboard.writeText = async (_text) => {
+    return;
   };
-  navigator.clipboard.writeText = overrideWriteText;
-  const cleanup = () => {
-    window.removeEventListener("pointerup", pointerListener, true);
-    window.removeEventListener(EVENT_CLOSE, clearHighlight);
-    if (navigator.clipboard.writeText === overrideWriteText) {
+  try {
+    const modulePath = "react-grab/core";
+    const reactGrabCore = await import(
+      /* @vite-ignore */
+      modulePath
+    );
+    apiInstance = reactGrabCore.init({
+      theme: { enabled: true },
+      onCopySuccess: (elements, content) => {
+        handleSelection(elements, content, options);
+      }
+    });
+    window[INIT_FLAG] = true;
+    return apiInstance;
+  } catch (error) {
+    console.error("[shipflow-overlay] Failed to initialize React Grab:", error);
+    if (originalWriteText) {
       navigator.clipboard.writeText = originalWriteText;
     }
+    return null;
+  }
+}
+function disposeReactGrab() {
+  if (apiInstance) {
+    try {
+      apiInstance.dispose();
+    } catch {
+    }
+    apiInstance = null;
+  }
+  if (originalWriteText && typeof navigator !== "undefined" && navigator.clipboard) {
+    navigator.clipboard.writeText = originalWriteText;
+    originalWriteText = null;
+  }
+  if (typeof window !== "undefined") {
+    window.removeEventListener(EVENT_CLOSE, clearHighlight);
     clearHighlight();
-    delete window[GLOBAL_KEY];
-  };
-  window[GLOBAL_KEY] = cleanup;
-  return cleanup;
+    delete window[INIT_FLAG];
+  }
 }
 
 // src/runtime/FlowOverlay.tsx
 var import_jsx_runtime = require("react/jsx-runtime");
-var HIGHLIGHT_QUERY = "[data-react-grab-chat-highlighted='true']";
+var HIGHLIGHT_ATTR2 = "data-react-grab-chat-highlighted";
+var HIGHLIGHT_QUERY = `[${HIGHLIGHT_ATTR2}='true']`;
+var LOADING_ATTR = "data-react-grab-loading";
+var SHIMMER_ATTR = "data-sf-shimmer-overlay";
 var OVERLAY_STYLE_ID = "shipflow-overlay-styles";
 var OVERLAY_ROOT_ID = "shipflow-overlay-root";
 var ensureOverlayStyles = (root) => {
@@ -979,6 +953,7 @@ function Bubble({
   onStop,
   onModelChange,
   onClose,
+  onUndo,
   modelOptions,
   statusSequence
 }) {
@@ -1175,16 +1150,18 @@ function Bubble({
     if (chat.statusAddonMode !== "summary") {
       return;
     }
+    onUndo();
     window.dispatchEvent(
       new CustomEvent(EVENT_UNDO, {
         detail: {
           instruction: chat.instruction,
           summary: (_a2 = chat.summary) != null ? _a2 : null,
-          filePath: chat.filePath
+          filePath: chat.filePath,
+          sessionId: chat.sessionId
         }
       })
     );
-  }, [chat]);
+  }, [chat, onUndo]);
   (0, import_react.useEffect)(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
@@ -1395,30 +1372,24 @@ function FlowOverlayProvider(props = {}) {
     if (props.enableClipboardInterceptor === false) {
       return;
     }
-    let cleanup;
-    loadReactGrabRuntime({
-      url: clipboardOptions.reactGrabUrl
-    }).then(() => {
-      var _a2, _b;
-      cleanup = registerClipboardInterceptor({
-        projectRoot: clipboardOptions.projectRoot,
-        highlightColor: clipboardOptions.highlightColor,
-        highlightStyleId: clipboardOptions.highlightStyleId,
-        logClipboardEndpoint: (_b = (_a2 = clipboardOptions.logClipboardEndpoint) != null ? _a2 : process.env.SHIPFLOW_OVERLAY_LOG_ENDPOINT) != null ? _b : null,
-        reactGrabUrl: clipboardOptions.reactGrabUrl
-      });
+    let mounted = true;
+    initReactGrab({
+      projectRoot: clipboardOptions.projectRoot,
+      highlightColor: clipboardOptions.highlightColor,
+      highlightStyleId: clipboardOptions.highlightStyleId
     }).catch((error) => {
-      console.error("[shipflow-overlay] Failed to load React Grab runtime", error);
+      if (mounted) {
+        console.error("[shipflow-overlay] Failed to initialize React Grab:", error);
+      }
     });
     return () => {
-      cleanup == null ? void 0 : cleanup();
+      mounted = false;
+      disposeReactGrab();
     };
   }, [
     clipboardOptions.highlightColor,
     clipboardOptions.highlightStyleId,
-    clipboardOptions.logClipboardEndpoint,
     clipboardOptions.projectRoot,
-    clipboardOptions.reactGrabUrl,
     props.enableClipboardInterceptor
   ]);
   const close = (0, import_react.useCallback)(() => {
@@ -1493,6 +1464,15 @@ function FlowOverlayProvider(props = {}) {
         let hasPromotedUpdating = false;
         const processEvent = (event) => {
           var _a3, _b2, _c;
+          if (event.event === "session") {
+            setChat(
+              (prev) => prev ? {
+                ...prev,
+                sessionId: event.sessionId
+              } : prev
+            );
+            return;
+          }
           if (event.event === "status") {
             const message = (_a3 = event.message) == null ? void 0 : _a3.trim();
             if (message) {
@@ -1726,6 +1706,106 @@ function FlowOverlayProvider(props = {}) {
     },
     [config.models]
   );
+  const shimmerRef = (0, import_react.useRef)({ overlay: null, element: null, scrollHandler: null, resizeHandler: null });
+  (0, import_react.useEffect)(() => {
+    const highlighted = document.querySelector(HIGHLIGHT_QUERY);
+    const isLoading = (chat == null ? void 0 : chat.status) === "submitting";
+    const shimmer = shimmerRef.current;
+    if (isLoading && highlighted && highlighted.isConnected) {
+      highlighted.setAttribute(LOADING_ATTR, "true");
+      if (!shimmer.overlay) {
+        const overlay = document.createElement("div");
+        overlay.setAttribute(SHIMMER_ATTR, "true");
+        document.body.appendChild(overlay);
+        shimmer.overlay = overlay;
+        shimmer.element = highlighted;
+        const updatePosition = () => {
+          if (!highlighted.isConnected || !shimmer.overlay) return;
+          const rect = highlighted.getBoundingClientRect();
+          shimmer.overlay.style.top = `${rect.top}px`;
+          shimmer.overlay.style.left = `${rect.left}px`;
+          shimmer.overlay.style.width = `${rect.width}px`;
+          shimmer.overlay.style.height = `${rect.height}px`;
+        };
+        updatePosition();
+        shimmer.scrollHandler = () => updatePosition();
+        shimmer.resizeHandler = () => updatePosition();
+        window.addEventListener("scroll", shimmer.scrollHandler, true);
+        window.addEventListener("resize", shimmer.resizeHandler);
+      }
+    } else {
+      if (shimmer.overlay) {
+        if (shimmer.scrollHandler) {
+          window.removeEventListener("scroll", shimmer.scrollHandler, true);
+        }
+        if (shimmer.resizeHandler) {
+          window.removeEventListener("resize", shimmer.resizeHandler);
+        }
+        shimmer.overlay.remove();
+        shimmer.overlay = null;
+        shimmer.scrollHandler = null;
+        shimmer.resizeHandler = null;
+      }
+      if (shimmer.element) {
+        shimmer.element.removeAttribute(LOADING_ATTR);
+        shimmer.element = null;
+      }
+      if (highlighted) {
+        highlighted.removeAttribute(LOADING_ATTR);
+      }
+    }
+    return () => {
+      if (shimmer.overlay) {
+        if (shimmer.scrollHandler) {
+          window.removeEventListener("scroll", shimmer.scrollHandler, true);
+        }
+        if (shimmer.resizeHandler) {
+          window.removeEventListener("resize", shimmer.resizeHandler);
+        }
+        shimmer.overlay.remove();
+        shimmer.overlay = null;
+        shimmer.scrollHandler = null;
+        shimmer.resizeHandler = null;
+      }
+      if (shimmer.element) {
+        shimmer.element.removeAttribute(LOADING_ATTR);
+        shimmer.element = null;
+      }
+    };
+  }, [chat == null ? void 0 : chat.status]);
+  const onUndo = (0, import_react.useCallback)(async () => {
+    const sessionId = chat == null ? void 0 : chat.sessionId;
+    if (!sessionId) {
+      console.warn("[shipflow-overlay] No session ID available for undo");
+      return;
+    }
+    try {
+      const undoEndpoint = config.endpoint.replace(/\/overlay\/?$/, "/undo");
+      const response = await fetch(undoEndpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ sessionId })
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        console.error("[shipflow-overlay] Undo failed:", data.error);
+        return;
+      }
+      setChat(
+        (prev) => prev ? {
+          ...prev,
+          status: "idle",
+          statusAddonMode: "idle",
+          summary: void 0,
+          sessionId: void 0
+        } : prev
+      );
+    } catch (error) {
+      console.error("[shipflow-overlay] Undo failed:", error);
+    }
+  }, [chat == null ? void 0 : chat.sessionId, config.endpoint]);
   if (!portalTarget || !chat) {
     return null;
   }
@@ -1739,6 +1819,7 @@ function FlowOverlayProvider(props = {}) {
         onStop: stop,
         onModelChange,
         onClose: close,
+        onUndo,
         modelOptions: config.models,
         statusSequence: config.statusSequence
       }
@@ -1752,7 +1833,7 @@ function FlowOverlayProvider(props = {}) {
   DEFAULT_STATUS_SEQUENCE,
   FlowOverlayProvider,
   Typewriter,
-  loadReactGrabRuntime,
-  registerClipboardInterceptor
+  disposeReactGrab,
+  initReactGrab
 });
 //# sourceMappingURL=index.cjs.map

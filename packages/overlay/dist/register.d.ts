@@ -1,15 +1,20 @@
-type ClipboardInterceptorOptions = {
+type ReactGrabAPI = {
+    activate: () => void;
+    deactivate: () => void;
+    toggle: () => void;
+    isActive: () => boolean;
+    dispose: () => void;
+    copyElement: (elements: Element | Element[]) => Promise<boolean>;
+    getState: () => unknown;
+    updateTheme: (theme: unknown) => void;
+    getTheme: () => unknown;
+};
+type InitReactGrabOptions = {
     projectRoot?: string;
     highlightColor?: string;
     highlightStyleId?: string;
-    logClipboardEndpoint?: string | null;
-    reactGrabUrl?: string;
 };
-declare function registerClipboardInterceptor(options?: ClipboardInterceptorOptions): () => void;
+declare function initReactGrab(options?: InitReactGrabOptions): Promise<ReactGrabAPI | null>;
+declare function disposeReactGrab(): void;
 
-type LoadOptions = {
-    url?: string;
-};
-declare function loadReactGrabRuntime(options?: LoadOptions): Promise<void>;
-
-export { type ClipboardInterceptorOptions, loadReactGrabRuntime, registerClipboardInterceptor };
+export { type InitReactGrabOptions, disposeReactGrab, initReactGrab };

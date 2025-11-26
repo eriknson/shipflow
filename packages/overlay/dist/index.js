@@ -3,9 +3,9 @@ import {
   DEFAULT_STATUS_SEQUENCE
 } from "./chunk-LHE54KC7.js";
 import {
-  loadReactGrabRuntime,
-  registerClipboardInterceptor
-} from "./chunk-JXYVODP6.js";
+  disposeReactGrab,
+  initReactGrab
+} from "./chunk-5GYDZT7T.js";
 
 // src/runtime/FlowOverlay.tsx
 import {
@@ -19,7 +19,10 @@ import {
 import { createPortal } from "react-dom";
 import { ArrowUp, Square, Command } from "lucide-react";
 import { Fragment, jsx, jsxs } from "react/jsx-runtime";
-var HIGHLIGHT_QUERY = "[data-react-grab-chat-highlighted='true']";
+var HIGHLIGHT_ATTR = "data-react-grab-chat-highlighted";
+var HIGHLIGHT_QUERY = `[${HIGHLIGHT_ATTR}='true']`;
+var LOADING_ATTR = "data-react-grab-loading";
+var SHIMMER_ATTR = "data-sf-shimmer-overlay";
 var OVERLAY_STYLE_ID = "shipflow-overlay-styles";
 var OVERLAY_ROOT_ID = "shipflow-overlay-root";
 var ensureOverlayStyles = (root) => {
@@ -651,6 +654,7 @@ function Bubble({
   onStop,
   onModelChange,
   onClose,
+  onUndo,
   modelOptions,
   statusSequence
 }) {
@@ -847,16 +851,18 @@ function Bubble({
     if (chat.statusAddonMode !== "summary") {
       return;
     }
+    onUndo();
     window.dispatchEvent(
       new CustomEvent(EVENT_UNDO, {
         detail: {
           instruction: chat.instruction,
           summary: (_a2 = chat.summary) != null ? _a2 : null,
-          filePath: chat.filePath
+          filePath: chat.filePath,
+          sessionId: chat.sessionId
         }
       })
     );
-  }, [chat]);
+  }, [chat, onUndo]);
   useEffect(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
@@ -1067,30 +1073,24 @@ function FlowOverlayProvider(props = {}) {
     if (props.enableClipboardInterceptor === false) {
       return;
     }
-    let cleanup;
-    loadReactGrabRuntime({
-      url: clipboardOptions.reactGrabUrl
-    }).then(() => {
-      var _a2, _b;
-      cleanup = registerClipboardInterceptor({
-        projectRoot: clipboardOptions.projectRoot,
-        highlightColor: clipboardOptions.highlightColor,
-        highlightStyleId: clipboardOptions.highlightStyleId,
-        logClipboardEndpoint: (_b = (_a2 = clipboardOptions.logClipboardEndpoint) != null ? _a2 : process.env.SHIPFLOW_OVERLAY_LOG_ENDPOINT) != null ? _b : null,
-        reactGrabUrl: clipboardOptions.reactGrabUrl
-      });
+    let mounted = true;
+    initReactGrab({
+      projectRoot: clipboardOptions.projectRoot,
+      highlightColor: clipboardOptions.highlightColor,
+      highlightStyleId: clipboardOptions.highlightStyleId
     }).catch((error) => {
-      console.error("[shipflow-overlay] Failed to load React Grab runtime", error);
+      if (mounted) {
+        console.error("[shipflow-overlay] Failed to initialize React Grab:", error);
+      }
     });
     return () => {
-      cleanup == null ? void 0 : cleanup();
+      mounted = false;
+      disposeReactGrab();
     };
   }, [
     clipboardOptions.highlightColor,
     clipboardOptions.highlightStyleId,
-    clipboardOptions.logClipboardEndpoint,
     clipboardOptions.projectRoot,
-    clipboardOptions.reactGrabUrl,
     props.enableClipboardInterceptor
   ]);
   const close = useCallback(() => {
@@ -1165,6 +1165,15 @@ function FlowOverlayProvider(props = {}) {
         let hasPromotedUpdating = false;
         const processEvent = (event) => {
           var _a3, _b2, _c;
+          if (event.event === "session") {
+            setChat(
+              (prev) => prev ? {
+                ...prev,
+                sessionId: event.sessionId
+              } : prev
+            );
+            return;
+          }
           if (event.event === "status") {
             const message = (_a3 = event.message) == null ? void 0 : _a3.trim();
             if (message) {
@@ -1398,6 +1407,106 @@ function FlowOverlayProvider(props = {}) {
     },
     [config.models]
   );
+  const shimmerRef = useRef({ overlay: null, element: null, scrollHandler: null, resizeHandler: null });
+  useEffect(() => {
+    const highlighted = document.querySelector(HIGHLIGHT_QUERY);
+    const isLoading = (chat == null ? void 0 : chat.status) === "submitting";
+    const shimmer = shimmerRef.current;
+    if (isLoading && highlighted && highlighted.isConnected) {
+      highlighted.setAttribute(LOADING_ATTR, "true");
+      if (!shimmer.overlay) {
+        const overlay = document.createElement("div");
+        overlay.setAttribute(SHIMMER_ATTR, "true");
+        document.body.appendChild(overlay);
+        shimmer.overlay = overlay;
+        shimmer.element = highlighted;
+        const updatePosition = () => {
+          if (!highlighted.isConnected || !shimmer.overlay) return;
+          const rect = highlighted.getBoundingClientRect();
+          shimmer.overlay.style.top = `${rect.top}px`;
+          shimmer.overlay.style.left = `${rect.left}px`;
+          shimmer.overlay.style.width = `${rect.width}px`;
+          shimmer.overlay.style.height = `${rect.height}px`;
+        };
+        updatePosition();
+        shimmer.scrollHandler = () => updatePosition();
+        shimmer.resizeHandler = () => updatePosition();
+        window.addEventListener("scroll", shimmer.scrollHandler, true);
+        window.addEventListener("resize", shimmer.resizeHandler);
+      }
+    } else {
+      if (shimmer.overlay) {
+        if (shimmer.scrollHandler) {
+          window.removeEventListener("scroll", shimmer.scrollHandler, true);
+        }
+        if (shimmer.resizeHandler) {
+          window.removeEventListener("resize", shimmer.resizeHandler);
+        }
+        shimmer.overlay.remove();
+        shimmer.overlay = null;
+        shimmer.scrollHandler = null;
+        shimmer.resizeHandler = null;
+      }
+      if (shimmer.element) {
+        shimmer.element.removeAttribute(LOADING_ATTR);
+        shimmer.element = null;
+      }
+      if (highlighted) {
+        highlighted.removeAttribute(LOADING_ATTR);
+      }
+    }
+    return () => {
+      if (shimmer.overlay) {
+        if (shimmer.scrollHandler) {
+          window.removeEventListener("scroll", shimmer.scrollHandler, true);
+        }
+        if (shimmer.resizeHandler) {
+          window.removeEventListener("resize", shimmer.resizeHandler);
+        }
+        shimmer.overlay.remove();
+        shimmer.overlay = null;
+        shimmer.scrollHandler = null;
+        shimmer.resizeHandler = null;
+      }
+      if (shimmer.element) {
+        shimmer.element.removeAttribute(LOADING_ATTR);
+        shimmer.element = null;
+      }
+    };
+  }, [chat == null ? void 0 : chat.status]);
+  const onUndo = useCallback(async () => {
+    const sessionId = chat == null ? void 0 : chat.sessionId;
+    if (!sessionId) {
+      console.warn("[shipflow-overlay] No session ID available for undo");
+      return;
+    }
+    try {
+      const undoEndpoint = config.endpoint.replace(/\/overlay\/?$/, "/undo");
+      const response = await fetch(undoEndpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ sessionId })
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        console.error("[shipflow-overlay] Undo failed:", data.error);
+        return;
+      }
+      setChat(
+        (prev) => prev ? {
+          ...prev,
+          status: "idle",
+          statusAddonMode: "idle",
+          summary: void 0,
+          sessionId: void 0
+        } : prev
+      );
+    } catch (error) {
+      console.error("[shipflow-overlay] Undo failed:", error);
+    }
+  }, [chat == null ? void 0 : chat.sessionId, config.endpoint]);
   if (!portalTarget || !chat) {
     return null;
   }
@@ -1411,6 +1520,7 @@ function FlowOverlayProvider(props = {}) {
         onStop: stop,
         onModelChange,
         onClose: close,
+        onUndo,
         modelOptions: config.models,
         statusSequence: config.statusSequence
       }
@@ -1423,7 +1533,7 @@ export {
   DEFAULT_STATUS_SEQUENCE,
   FlowOverlayProvider,
   Typewriter,
-  loadReactGrabRuntime,
-  registerClipboardInterceptor
+  disposeReactGrab,
+  initReactGrab
 };
 //# sourceMappingURL=index.js.map

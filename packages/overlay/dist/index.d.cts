@@ -1,7 +1,7 @@
 import * as react from 'react';
 import * as react_jsx_runtime from 'react/jsx-runtime';
-import { ClipboardInterceptorOptions } from './register.cjs';
-export { loadReactGrabRuntime, registerClipboardInterceptor } from './register.cjs';
+import { InitReactGrabOptions } from './register.cjs';
+export { disposeReactGrab, initReactGrab } from './register.cjs';
 
 type ModelOption = {
     value: string;
@@ -16,7 +16,7 @@ type ShipflowOverlayConfig = {
 
 type FlowOverlayProps = Partial<ShipflowOverlayConfig> & {
     enableClipboardInterceptor?: boolean;
-    clipboardOptions?: ClipboardInterceptorOptions;
+    clipboardOptions?: InitReactGrabOptions;
 };
 declare function Typewriter({ text }: {
     text: string;
@@ -38,4 +38,4 @@ declare const DEFAULT_MODEL_OPTIONS: readonly [{
     readonly label: "GPT-5.1 Codex High";
 }];
 
-export { ClipboardInterceptorOptions, DEFAULT_MODEL_OPTIONS, DEFAULT_STATUS_SEQUENCE, type FlowOverlayProps, FlowOverlayProvider, type ModelOption, type ShipflowOverlayConfig, type StatusSequence, Typewriter };
+export { DEFAULT_MODEL_OPTIONS, DEFAULT_STATUS_SEQUENCE, type FlowOverlayProps, FlowOverlayProvider, InitReactGrabOptions, type ModelOption, type ShipflowOverlayConfig, type StatusSequence, Typewriter };
