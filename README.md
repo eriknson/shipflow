@@ -2,14 +2,14 @@
 
 **Point-and-click editing for Next.js, powered by [Cursor Agent](https://cursor.com/blog/cli) and [React Grab](https://www.react-grab.com/).**
 
-Hold `⌘+C`, click any component, describe the change → Cursor edits the code.
+Hold `⌘+C`, click any component, describe the change → Cursor edits the code in context.
 
 ## Setup
 
 ### 1. Install Cursor Agent CLI
 
 ```bash
-# In Cursor, run:
+curl https://cursor.com/install -fsSL | bash
 cursor-agent login
 ```
 
