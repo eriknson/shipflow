@@ -41,3 +41,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Cursor - ignore user-specific stuff but allow project commands
+.cursor/*
+!.cursor/commands/
