@@ -2,6 +2,17 @@
 
 Shipflow combines React Grab with Cursor Agent so any React project can select and edit components in context.
 
+## What is React Grab?
+
+React Grab is a powerful browser-based tool that enables you to select React components directly from your running application. When you hold **CMD+C** (or **Ctrl+C** on Windows/Linux) while hovering over a component, React Grab captures:
+
+- **HTML Frame**: The rendered HTML structure of the selected component
+- **Code Location**: The exact file path and line numbers where the component is defined
+
+This captured information is then seamlessly sent to Cursor Agent, allowing you to edit components with full context awareness. The overlay provides visual feedback with highlighted outlines and shimmer effects when components are selected, making it easy to see what you're working with.
+
+React Grab works by intercepting clipboard operations and extracting component metadata from React's component tree, enabling a smooth workflow from visual selection to code editing.
+
 ## Installation
 
 ```bash
