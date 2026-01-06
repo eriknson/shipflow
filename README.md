@@ -1,17 +1,10 @@
 # @shipflow/overlay
 
-Shipflow combines React Grab with Cursor Agent so any React project can select and edit components in context.
+A Next.js overlay that integrates React Grab with Cursor Agent, enabling visual component selection and context-aware editing directly from your running application.
 
-## What is React Grab?
+## Overview
 
-React Grab is a powerful browser-based tool that enables you to select React components directly from your running application. When you hold **CMD+C** (or **Ctrl+C** on Windows/Linux) while hovering over a component, React Grab captures:
-
-- **HTML Frame**: The rendered HTML structure of the selected component
-- **Code Location**: The exact file path and line numbers where the component is defined
-
-This captured information is then seamlessly sent to Cursor Agent, allowing you to edit components with full context awareness. The overlay provides visual feedback with highlighted outlines and shimmer effects when components are selected, making it easy to see what you're working with.
-
-React Grab works by intercepting clipboard operations and extracting component metadata from React's component tree, enabling a smooth workflow from visual selection to code editing.
+Select React components in your browser using **CMD+C** (or **Ctrl+C** on Windows/Linux) while hovering. The overlay captures component metadata—rendered HTML and source location—and sends it to Cursor Agent for editing with full context.
 
 ## Installation
 
@@ -21,26 +14,30 @@ npm install -D @shipflow/overlay
 
 ## Quickstart
 
-1. **Wrap your Next config**:
+### Option 1: Use the CLI (Recommended)
+
+```bash
+npx shipflow-overlay init
+```
+
+This scaffolds the necessary files and checks for `cursor-agent`.
+
+### Option 2: Manual Setup
+
+1. **Wrap your Next.js config:**
 
    ```ts
    // next.config.ts
    import { withShipflowOverlay } from '@shipflow/overlay/next';
 
-   const nextConfig = {
+   export default withShipflowOverlay({
      /* your config */
-   };
-
-   export default withShipflowOverlay(nextConfig, {
-     logClipboardEndpoint: '/api/log-clipboard',
    });
    ```
 
-2. **Render `ShipflowOverlay` in your root layout**:
+2. **Add the overlay to your root layout:**
 
-   Import `ShipflowOverlay` directly from `@shipflow/overlay` using `next/dynamic` for optimal performance. The implementation differs based on whether your layout is a Server Component or Client Component:
-
-   **For Server Component layouts** (no `"use client"` directive):
+   **Server Component layout:**
 
    ```tsx
    // app/layout.tsx
@@ -52,11 +49,7 @@ npm install -D @shipflow/overlay
      })),
    );
 
-   export default function RootLayout({
-     children,
-   }: {
-     children: React.ReactNode;
-   }) {
+   export default function RootLayout({ children }: { children: React.ReactNode }) {
      return (
        <html lang="en">
          <body>
@@ -68,7 +61,7 @@ npm install -D @shipflow/overlay
    }
    ```
 
-   **For Client Component layouts** (has `"use client"` directive):
+   **Client Component layout:**
 
    ```tsx
    // app/layout.tsx
@@ -77,18 +70,11 @@ npm install -D @shipflow/overlay
    import dynamic from 'next/dynamic';
 
    const ShipflowOverlay = dynamic(
-     () =>
-       import('@shipflow/overlay').then((mod) => ({
-         default: mod.ShipflowOverlay,
-       })),
+     () => import('@shipflow/overlay').then((mod) => ({ default: mod.ShipflowOverlay })),
      { ssr: false },
    );
 
-   export default function RootLayout({
-     children,
-   }: {
-     children: React.ReactNode;
-   }) {
+   export default function RootLayout({ children }: { children: React.ReactNode }) {
      return (
        <html lang="en">
          <body>
@@ -100,7 +86,7 @@ npm install -D @shipflow/overlay
    }
    ```
 
-3. **Wire the API route**:
+3. **Create the API route:**
 
    ```ts
    // app/api/shipflow/overlay/route.ts
@@ -111,41 +97,39 @@ npm install -D @shipflow/overlay
    export const POST = createNextHandler();
    ```
 
-4. **Cursor CLI**: The package automatically searches for `cursor-agent` in PATH and common installation directories. If not found, set `CURSOR_AGENT_BIN` to the absolute path.
+4. **Configure Cursor Agent:**
 
-## CLI helper
+   The package automatically searches for `cursor-agent` in PATH. If not found, set `CURSOR_AGENT_BIN` in your environment:
 
-```bash
-npx shipflow-overlay init
-```
-
-Scaffolds the provider and API route, checks for `cursor-agent`, and adds `CURSOR_AGENT_BIN` to `.env.example`.
+   ```bash
+   CURSOR_AGENT_BIN=/path/to/cursor-agent
+   ```
 
 ## Configuration
 
-**Next.js config:**
+### Next.js Config
 
 ```ts
 withShipflowOverlay(config, {
-  enableInProduction?: boolean;  // Enable in production (default: false)
+  enableInProduction?: boolean; // default: false
 });
 ```
 
-**API handler:**
+### API Handler
 
 ```ts
 createNextHandler({
-  cursorAgentBinary?: string;     // Custom binary path
-  timeoutMs?: number;             // Timeout in ms (default: 240000)
-  allowInProduction?: boolean;    // Allow in production (default: false)
+  cursorAgentBinary?: string;    // Custom binary path
+  timeoutMs?: number;             // default: 240000
+  allowInProduction?: boolean;    // default: false
 });
 ```
 
-**Environment variables:**
+### Environment Variables
 
-- `CURSOR_AGENT_BIN`: Absolute path to `cursor-agent` (if not in PATH)
-- `SHIPFLOW_OVERLAY_ENABLED`: Set to `"true"` to enable overlay
-- `SHIPFLOW_OVERLAY_AGENT_TIMEOUT_MS`: Timeout in milliseconds
+- `CURSOR_AGENT_BIN` - Absolute path to `cursor-agent` (if not in PATH)
+- `SHIPFLOW_OVERLAY_ENABLED` - Set to `"true"` to enable overlay
+- `SHIPFLOW_OVERLAY_AGENT_TIMEOUT_MS` - Timeout in milliseconds
 
 ## License
 
